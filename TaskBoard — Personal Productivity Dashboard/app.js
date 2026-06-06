@@ -935,64 +935,6 @@ async function quickStatusChange(taskId, newStatus) {
   }
 }
 
-// ─── Sample Data ─────────────────────────────────────────────
-async function generateSampleData() {
-  const allTasks = await getAllTasks();
-  if (allTasks.length > 0) return; // already have data
-
-  const today     = todayStr();
-  const yesterday = getPreviousDay(today);
-  const tomorrow  = getNextDay(today);
-
-  const samples = [
-    {
-      taskId:"T-001", title:"PagerDuty Integration - Configure webhooks",
-      category:"Development", priority:"High", status:"In Progress",
-      assignedTo:"Ashish Moghe", dueDate:today, estimatedHours:4, actualHours:2,
-      notes:"Waiting for API keys from Paul", carriedFrom:"", carryForward:true,
-      dateAssigned:today, createdAt:nowISO(), updatedAt:nowISO()
-    },
-    {
-      taskId:"T-002", title:"ACL fix for RITM form visibility",
-      category:"Development", priority:"Critical", status:"In Progress",
-      assignedTo:"Ashish Moghe", dueDate:today, estimatedHours:3, actualHours:1,
-      notes:"Security review pending", carriedFrom:"", carryForward:true,
-      dateAssigned:today, createdAt:nowISO(), updatedAt:nowISO()
-    },
-    {
-      taskId:"T-003", title:"Weekly standup with Thaddeus",
-      category:"Meeting", priority:"Medium", status:"Completed",
-      assignedTo:"Ashish Moghe", dueDate:yesterday, estimatedHours:1, actualHours:0.5,
-      notes:"", carriedFrom:"", carryForward:false,
-      dateAssigned:yesterday, createdAt:nowISO(), updatedAt:nowISO()
-    },
-    {
-      taskId:"T-004", title:"Test Okta SSO flow on staging",
-      category:"Testing", priority:"High", status:"Completed",
-      assignedTo:"Ashish Moghe", dueDate:yesterday, estimatedHours:2, actualHours:2.5,
-      notes:"Found edge case with MFA", carriedFrom:"", carryForward:false,
-      dateAssigned:yesterday, createdAt:nowISO(), updatedAt:nowISO()
-    },
-    {
-      taskId:"T-005", title:"Review catalog item requirements",
-      category:"Stakeholder", priority:"Medium", status:"Pending",
-      assignedTo:"Ashish Moghe", dueDate:tomorrow, estimatedHours:2, actualHours:0,
-      notes:"", carriedFrom:"", carryForward:true,
-      dateAssigned:today, createdAt:nowISO(), updatedAt:nowISO()
-    },
-    {
-      taskId:"T-006", title:"Now Assist incident follow-up",
-      category:"Blocker", priority:"High", status:"On Hold",
-      assignedTo:"Ashish Moghe", dueDate:today, estimatedHours:1, actualHours:0,
-      notes:"Blocked: Waiting on Thaddeus response", carriedFrom:"", carryForward:true,
-      dateAssigned:today, createdAt:nowISO(), updatedAt:nowISO()
-    }
-  ];
-
-  for (const s of samples) await addTask(s);
-  await setSetting("taskCounter", 6);
-}
-
 // ─── Tab Switching ───────────────────────────────────────────
 function switchTab(tab) {
   activeTab = tab;
@@ -1033,7 +975,6 @@ async function init() {
     initTheme();
 
     await initDB();
-    await generateSampleData();
     await autoCarryForward();
 
     // Set date picker
