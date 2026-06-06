@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>🎯 TaskBoard — Knowledge Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#475569;border-radius:99px}
+
+/* ── sticky nav ── */
+.topnav{position:sticky;top:0;z-index:50;background:rgba(15,23,42,.85);backdrop-filter:blur(10px);
+  border-bottom:1px solid #1e293b;padding:.65rem 0}
+.topnav-inner{max-width:1200px;margin:0 auto;padding:0 1.5rem;display:flex;align-items:center;gap:1.5rem;overflow-x:auto}
+.topnav a{color:#94a3b8;font-size:.8rem;font-weight:600;text-decoration:none;white-space:nowrap;
+  padding:.3rem .7rem;border-radius:.4rem;transition:all .2s}
+.topnav a:hover,.topnav a.active{color:#e2e8f0;background:#1e293b}
+
+.container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+h1{font-size:2rem;font-weight:800;margin-bottom:.25rem}
+.subtitle{color:#64748b;font-size:.9rem;margin-bottom:2.5rem}
+h2{font-size:1.35rem;font-weight:800;margin-bottom:1.25rem;display:flex;align-items:center;gap:.5rem}
+.section{margin-bottom:4rem;scroll-margin-top:4rem}
+
+/* ── cards ── */
+.card{background:#1e293b;border:1px solid #334155;border-radius:.85rem;padding:1.25rem;transition:all .2s}
+.card:hover{border-color:#475569}
+
+/* ── Section 1: Architecture ── */
+.arch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:2rem}
+.arch-card{text-align:center;padding:1.5rem}
+.arch-icon{font-size:2rem;margin-bottom:.5rem}
+.arch-name{font-size:1rem;font-weight:700;color:#f1f5f9}
+.arch-size{font-size:.75rem;color:#64748b;margin:.25rem 0}
+.arch-stat{font-size:.7rem;color:#94a3b8;line-height:1.5}
+.arch-arrows{display:flex;justify-content:center;align-items:center;gap:.5rem;margin-bottom:2rem;
+  font-size:.75rem;color:#64748b;font-weight:600}
+.arrow-line{width:80px;height:2px;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:9px}
+.api-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.api-card{text-align:center;padding:1rem;border:1px dashed #334155;border-radius:.75rem;background:#0f172a}
+.api-card .api-name{font-size:.8rem;font-weight:700;color:#94a3b8}
+.api-card .api-icon{font-size:1.3rem;margin-bottom:.25rem}
+
+/* ── Section 2: Component Map ── */
+.layer-group{margin-bottom:2rem}
+.layer-label{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  padding:.3rem .75rem;border-radius:999px;display:inline-flex;align-items:center;gap:.35rem;margin-bottom:.75rem}
+.layer-data{background:rgba(59,130,246,.15);color:#93c5fd}
+.layer-ui{background:rgba(139,92,246,.15);color:#c4b5fd}
+.layer-logic{background:rgba(16,185,129,.15);color:#6ee7b7}
+.layer-render{background:rgba(245,158,11,.15);color:#fcd34d}
+.layer-events{background:rgba(244,63,94,.15);color:#fda4af}
+.node-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.65rem}
+.node-card{padding:.75rem 1rem;border-radius:.65rem;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.node-card .node-name{font-size:.8rem;font-weight:700;color:#f1f5f9}
+.node-card .node-desc{font-size:.65rem;color:#64748b;margin-top:.15rem}
+.node-card:hover{transform:translateY(-1px)}
+.node-card.dimmed{opacity:.2!important;pointer-events:none}
+.node-card[data-layer="data"]{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.15)}
+.node-card[data-layer="data"]:hover,.node-card[data-layer="data"].selected{border-color:#3b82f6;box-shadow:0 0 16px rgba(59,130,246,.2)}
+.node-card[data-layer="ui"]{background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.15)}
+.node-card[data-layer="ui"]:hover,.node-card[data-layer="ui"].selected{border-color:#8b5cf6;box-shadow:0 0 16px rgba(139,92,246,.2)}
+.node-card[data-layer="logic"]{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.15)}
+.node-card[data-layer="logic"]:hover,.node-card[data-layer="logic"].selected{border-color:#10b981;box-shadow:0 0 16px rgba(16,185,129,.2)}
+.node-card[data-layer="render"]{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.15)}
+.node-card[data-layer="render"]:hover,.node-card[data-layer="render"].selected{border-color:#f59e0b;box-shadow:0 0 16px rgba(245,158,11,.2)}
+.node-card[data-layer="events"]{background:rgba(244,63,94,.08);border-color:rgba(244,63,94,.15)}
+.node-card[data-layer="events"]:hover,.node-card[data-layer="events"].selected{border-color:#f43f5e;box-shadow:0 0 16px rgba(244,63,94,.2)}
+
+.detail-panel{margin-top:1rem;padding:1.25rem;border-radius:.85rem;background:#1e293b;border:1px solid #334155;
+  display:none;animation:fadeIn .2s ease}
+.detail-panel.show{display:block}
+.detail-panel h4{font-size:.9rem;font-weight:700;color:#f1f5f9;margin-bottom:.5rem}
+.detail-panel p{font-size:.78rem;color:#94a3b8;margin-bottom:.75rem}
+.detail-list{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.5rem}
+.detail-tag{font-size:.65rem;font-weight:600;padding:.2rem .55rem;border-radius:999px}
+.tag-calls{background:rgba(59,130,246,.15);color:#93c5fd}
+.tag-calledby{background:rgba(16,185,129,.15);color:#6ee7b7}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Section 3: Call Graph Tree ── */
+.tree{padding-left:0;list-style:none}
+.tree ul{padding-left:1.5rem;list-style:none;overflow:hidden;transition:max-height .3s ease;border-left:1px solid #334155}
+.tree li{position:relative}
+.tree-node{display:inline-flex;align-items:center;gap:.5rem;padding:.35rem .75rem;border-radius:.5rem;
+  cursor:pointer;font-size:.78rem;font-weight:600;margin:.15rem 0;transition:background .15s}
+.tree-node:hover{background:#334155}
+.tree-node .arrow{display:inline-block;width:12px;font-size:.65rem;color:#64748b;transition:transform .2s}
+.tree-node .arrow.open{transform:rotate(90deg)}
+.tree-node .fn-name{color:#f1f5f9}
+.tree-node .layer-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-data{background:#3b82f6}.dot-logic{background:#10b981}.dot-render{background:#f59e0b}
+.dot-events{background:#f43f5e}.dot-ui{background:#8b5cf6}
+.tree ul.collapsed{max-height:0!important;opacity:0;pointer-events:none}
+
+/* ── Section 4: Data Flows ── */
+.flow{margin-bottom:2rem}
+.flow-title{font-size:.85rem;font-weight:700;color:#cbd5e1;margin-bottom:.75rem}
+.flow-steps{display:flex;align-items:center;gap:0;overflow-x:auto;padding:.5rem 0}
+.flow-step{padding:.5rem .85rem;border-radius:.6rem;font-size:.7rem;font-weight:600;white-space:nowrap;flex-shrink:0}
+.step-user{background:rgba(244,63,94,.12);color:#fda4af;border:1px solid rgba(244,63,94,.25)}
+.step-fn{background:rgba(59,130,246,.12);color:#93c5fd;border:1px solid rgba(59,130,246,.25)}
+.step-db{background:rgba(16,185,129,.12);color:#6ee7b7;border:1px solid rgba(16,185,129,.25)}
+.step-ui{background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.25)}
+.flow-arrow{color:#475569;font-size:.75rem;padding:0 .35rem;flex-shrink:0}
+
+/* ── Section 5: Schema ── */
+.schema-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.schema-table th{text-align:left;padding:.6rem .75rem;background:#0f172a;color:#94a3b8;font-weight:700;
+  border-bottom:1px solid #334155;font-size:.7rem;text-transform:uppercase;letter-spacing:.03em}
+.schema-table td{padding:.55rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1}
+.schema-table tr:hover td{background:rgba(99,102,241,.05)}
+.field-required{color:#818cf8;font-weight:700}
+.field-auto{color:#6ee7b7;font-weight:700}
+.field-optional{color:#94a3b8}
+.idx-badge{font-size:.6rem;background:rgba(16,185,129,.15);color:#6ee7b7;padding:.1rem .4rem;
+  border-radius:999px;font-weight:700}
+
+.footer{text-align:center;padding:3rem 0;color:#475569;font-size:.75rem;border-top:1px solid #1e293b;margin-top:2rem}
+
+@media(max-width:768px){
+  .arch-grid,.api-grid{grid-template-columns:1fr}
+  .node-grid{grid-template-columns:repeat(2,1fr)}
+  .flow-steps{overflow-x:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav class="topnav">
+<div class="topnav-inner">
+  <span style="font-weight:800;color:#f1f5f9;font-size:.85rem">🎯 Knowledge Graph</span>
+  <a href="#overview">Overview</a>
+  <a href="#components">Components</a>
+  <a href="#callgraph">Call Graph</a>
+  <a href="#dataflow">Data Flow</a>
+  <a href="#schema">Schema</a>
+</div>
+</nav>
+
+<div class="container">
+
+<h1>🎯 TaskBoard — Knowledge Graph</h1>
+<p class="subtitle">Interactive architecture map of the entire codebase</p>
+
+<!-- ═══ SECTION 1: ARCHITECTURE OVERVIEW ═══ -->
+<div id="overview" class="section">
+<h2>🏗️ Architecture Overview</h2>
+
+<div class="arch-grid">
+  <div class="card arch-card">
+    <div class="arch-icon">📄</div>
+    <div class="arch-name">index.html</div>
+    <div class="arch-size">~18 KB</div>
+    <div class="arch-stat">3 Tabs · 3 Modals · Toast<br/>Header · Date Nav · Calendar Grid<br/>14 form inputs · 20+ buttons</div>
+  </div>
+  <div class="card arch-card">
+    <div class="arch-icon">🎨</div>
+    <div class="arch-name">styles.css</div>
+    <div class="arch-size">~20 KB</div>
+    <div class="arch-stat">Dual theme (dark/light)<br/>17 style categories<br/>Calendar · Badges · Animations<br/>Responsive + Print</div>
+  </div>
+  <div class="card arch-card">
+    <div class="arch-icon">⚡</div>
+    <div class="arch-name">app.js</div>
+    <div class="arch-size">~43 KB</div>
+    <div class="arch-stat">10 DB functions · 6 renderers<br/>3 tab engines · Theme system<br/>Carry-forward automation<br/>Import/Export · 40+ functions</div>
+  </div>
+</div>
+
+<div class="arch-arrows">
+  <span>index.html</span>
+  <span class="arrow-line"></span>
+  <span>loads →</span>
+  <span class="arrow-line"></span>
+  <span>styles.css + app.js</span>
+</div>
+
+<div class="api-grid">
+  <div class="api-card"><div class="api-icon">🗄️</div><div class="api-name">IndexedDB</div></div>
+  <div class="api-card"><div class="api-icon">💾</div><div class="api-name">localStorage</div></div>
+  <div class="api-card"><div class="api-icon">🖥️</div><div class="api-name">DOM API</div></div>
+</div>
+</div>
+
+<!-- ═══ SECTION 2: INTERACTIVE COMPONENT MAP ═══ -->
+<div id="components" class="section">
+<h2>🧩 Interactive Component Map</h2>
+<p style="font-size:.78rem;color:#64748b;margin-bottom:1.25rem">Click any node to see its connections</p>
+
+<div id="node-map">
+  <!-- Data Layer -->
+  <div class="layer-group">
+    <div class="layer-label layer-data">🗄️ Data Layer</div>
+    <div class="node-grid" id="nodes-data"></div>
+  </div>
+  <!-- UI Layer -->
+  <div class="layer-group">
+    <div class="layer-label layer-ui">🎨 UI Components</div>
+    <div class="node-grid" id="nodes-ui"></div>
+  </div>
+  <!-- Logic Layer -->
+  <div class="layer-group">
+    <div class="layer-label layer-logic">⚙️ Logic</div>
+    <div class="node-grid" id="nodes-logic"></div>
+  </div>
+  <!-- Render Layer -->
+  <div class="layer-group">
+    <div class="layer-label layer-render">📊 Renderers</div>
+    <div class="node-grid" id="nodes-render"></div>
+  </div>
+  <!-- Events Layer -->
+  <div class="layer-group">
+    <div class="layer-label layer-events">🔌 Event Handlers</div>
+    <div class="node-grid" id="nodes-events"></div>
+  </div>
+</div>
+
+<div id="detail-panel" class="detail-panel"></div>
+</div>
+
+<!-- ═══ SECTION 3: FUNCTION CALL GRAPH ═══ -->
+<div id="callgraph" class="section">
+<h2>🌳 Function Call Graph</h2>
+<p style="font-size:.78rem;color:#64748b;margin-bottom:1rem">Click nodes to expand/collapse</p>
+<div class="card" style="padding:1.5rem;overflow-x:auto">
+  <ul class="tree" id="call-tree"></ul>
+</div>
+</div>
+
+<!-- ═══ SECTION 4: DATA FLOW DIAGRAMS ═══ -->
+<div id="dataflow" class="section">
+<h2>🔀 Data Flow Diagrams</h2>
+<div id="flow-container"></div>
+</div>
+
+<!-- ═══ SECTION 5: TASK SCHEMA ═══ -->
+<div id="schema" class="section">
+<h2>📋 Task Data Schema</h2>
+<div class="card" style="padding:0;overflow:hidden;overflow-x:auto">
+  <table class="schema-table" id="schema-table">
+    <thead><tr><th>Field</th><th>Type</th><th>Index</th><th>Category</th><th>Description</th><th>Example</th></tr></thead>
+    <tbody id="schema-body"></tbody>
+  </table>
+</div>
+</div>
+
+<div class="footer">Generated from TaskBoard codebase • June 2026</div>
+</div>
+
+<script>
+// ═══ DATA ═══
+
+const nodes = {
+  // Data Layer
+  initDB:        {layer:"data", desc:"Opens/creates IndexedDB + object stores", calls:[], calledBy:["init"]},
+  addTask:       {layer:"data", desc:"Puts task into tasks store (also used for update)", calls:[], calledBy:["saveTask","carryForward","importReplace","importMerge","generateSampleData"]},
+  deleteTask:    {layer:"data", desc:"Removes task by taskId", calls:[], calledBy:["confirmDelete"]},
+  getTask:       {layer:"data", desc:"Fetches single task by taskId", calls:[], calledBy:["saveTask","quickStatusChange","importMerge","openTaskModal"]},
+  getTasksByDate:{layer:"data", desc:"Fetches all tasks for a date (via index)", calls:[], calledBy:["renderProductivity","carryForward","showDayDetail"]},
+  getAllTasks:    {layer:"data", desc:"Fetches every task in the store", calls:[], calledBy:["renderReports","renderCalendar","exportData","importMerge","generateSampleData"]},
+  clearAllTasks: {layer:"data", desc:"Wipes the entire tasks store", calls:[], calledBy:["importReplace"]},
+  getSetting:    {layer:"data", desc:"Reads a setting by key", calls:[], calledBy:["autoCarryForward","carryForward","saveTask"]},
+  setSetting:    {layer:"data", desc:"Writes a key-value setting", calls:[], calledBy:["carryForward","saveTask","importReplace","importMerge","generateSampleData"]},
+
+  // UI
+  ProductivityTab:{layer:"ui", desc:"Main dashboard: 4 card sections + date nav", calls:["renderProductivity"], calledBy:["switchTab"]},
+  ReportsTab:     {layer:"ui", desc:"Monthly summary, daily trend, category charts", calls:["renderReports"], calledBy:["switchTab"]},
+  CalendarTab:    {layer:"ui", desc:"Monthly grid with status dots + day detail", calls:["renderCalendar"], calledBy:["switchTab"]},
+  TaskModal:      {layer:"ui", desc:"Add/Edit form modal with all fields", calls:[], calledBy:["openTaskModal","saveTask"]},
+  DeleteModal:    {layer:"ui", desc:"Confirmation dialog for task deletion", calls:[], calledBy:["openDeleteModal","confirmDelete"]},
+  ImportModal:    {layer:"ui", desc:"Replace vs Merge choice for imports", calls:[], calledBy:["handleImportFile"]},
+  ToastSystem:    {layer:"ui", desc:"Top-right notification toasts (auto-dismiss)", calls:[], calledBy:["showToast"]},
+  HeaderNav:      {layer:"ui", desc:"Brand, theme toggle, import/export buttons", calls:[], calledBy:["init"]},
+
+  // Logic
+  carryForward:  {layer:"logic", desc:"Clones incomplete tasks from previous day", calls:["getTasksByDate","getSetting","addTask","setSetting","showToast","renderProductivity"], calledBy:["autoCarryForward","btnCarryForward"]},
+  autoCarryForward:{layer:"logic", desc:"Runs carry-forward on page load if needed", calls:["getSetting","carryForward"], calledBy:["init"]},
+  themeSystem:   {layer:"logic", desc:"Dark/light toggle via body.dark + localStorage", calls:[], calledBy:["initTheme","toggleTheme"]},
+  importFlow:    {layer:"logic", desc:"File parse → validate → Replace or Merge", calls:["clearAllTasks","addTask","getTask","setSetting","refreshActiveView"], calledBy:["handleImportFile"]},
+  exportFlow:    {layer:"logic", desc:"getAllTasks → JSON blob → download file", calls:["getAllTasks"], calledBy:["btnExport"]},
+  sampleDataGen: {layer:"logic", desc:"Creates 6 demo tasks on first launch", calls:["getAllTasks","addTask","setSetting"], calledBy:["init"]},
+
+  // Renderers
+  renderProductivity:{layer:"render", desc:"Fetches today+yesterday tasks, renders 4 sections", calls:["getTasksByDate","renderCompactCard","emptyState"], calledBy:["init","refreshActiveView","carryForward"]},
+  renderReports:     {layer:"render", desc:"Monthly stats + CSS bar charts", calls:["getAllTasks"], calledBy:["refreshActiveView","switchTab"]},
+  renderCalendar:    {layer:"render", desc:"Builds 7-col month grid with status dots", calls:["getAllTasks","showDayDetail"], calledBy:["refreshActiveView","switchTab"]},
+  showDayDetail:     {layer:"render", desc:"Shows task list for clicked calendar day", calls:["getTasksByDate","renderCompactCard"], calledBy:["renderCalendar"]},
+  renderCompactCard: {layer:"render", desc:"Compact card HTML with badges + actions", calls:[], calledBy:["renderProductivity","showDayDetail"]},
+  renderLargeCard:   {layer:"render", desc:"Full-width card (preserved for future use)", calls:[], calledBy:[]},
+  emptyState:        {layer:"render", desc:"Friendly empty placeholder with emoji", calls:[], calledBy:["renderProductivity","showDayDetail"]},
+
+  // Events
+  attachCardEvents:{layer:"events", desc:"Delegates click/change on card containers", calls:["quickStatusChange","openTaskModal","openDeleteModal"], calledBy:["init"]},
+  quickStatusChange:{layer:"events", desc:"Inline status dropdown → update + re-render", calls:["getTask","addTask","showToast","refreshActiveView"], calledBy:["attachCardEvents"]},
+  switchTab:        {layer:"events", desc:"Tab toggle + render active tab", calls:["renderReports","renderCalendar"], calledBy:["tabBtnClick"]},
+  saveTask:         {layer:"events", desc:"Reads form → add or update task in DB", calls:["getTask","addTask","getSetting","setSetting","refreshActiveView","showToast"], calledBy:["btnSaveTask"]},
+  confirmDelete:    {layer:"events", desc:"Deletes task after confirmation", calls:["deleteTask","refreshActiveView","showToast"], calledBy:["btnConfirmDelete"]},
+  openTaskModal:    {layer:"events", desc:"Opens modal (blank or pre-filled for edit)", calls:["getTask"], calledBy:["attachCardEvents","btnNewTask"]},
+  refreshActiveView:{layer:"events", desc:"Re-renders whichever tab is active", calls:["renderProductivity","renderReports","renderCalendar","showDayDetail"], calledBy:["saveTask","confirmDelete","quickStatusChange","importFlow"]}
+};
+
+// ═══ RENDER NODES ═══
+const layerContainers = {data:"nodes-data",ui:"nodes-ui",logic:"nodes-logic",render:"nodes-render",events:"nodes-events"};
+
+Object.entries(nodes).forEach(([id,n])=>{
+  const cont = document.getElementById(layerContainers[n.layer]);
+  if(!cont) return;
+  const div = document.createElement("div");
+  div.className = "node-card";
+  div.dataset.layer = n.layer;
+  div.dataset.id = id;
+  div.innerHTML = `<div class="node-name">${id}</div><div class="node-desc">${n.desc}</div>`;
+  cont.appendChild(div);
+});
+
+// ═══ NODE INTERACTION ═══
+let selectedNode = null;
+document.getElementById("node-map").addEventListener("click", e => {
+  const card = e.target.closest(".node-card");
+  const panel = document.getElementById("detail-panel");
+
+  if (!card) {
+    // Clicked background — deselect
+    deselectAll();
+    return;
+  }
+
+  const id = card.dataset.id;
+  if (selectedNode === id) { deselectAll(); return; }
+
+  selectedNode = id;
+  const n = nodes[id];
+  const related = new Set([id, ...n.calls, ...n.calledBy]);
+  // Also add reverse: nodes that list this in their calls
+  Object.entries(nodes).forEach(([nid, nd]) => {
+    if (nd.calls.includes(id)) related.add(nid);
+    if (nd.calledBy.includes(id)) related.add(nid);
+  });
+
+  document.querySelectorAll(".node-card").forEach(c => {
+    c.classList.toggle("dimmed", !related.has(c.dataset.id));
+    c.classList.toggle("selected", c.dataset.id === id);
+  });
+
+  const callsTags = n.calls.map(c => `<span class="detail-tag tag-calls">${c}</span>`).join("") || '<span style="color:#64748b;font-size:.7rem">None</span>';
+  const calledByTags = n.calledBy.map(c => `<span class="detail-tag tag-calledby">${c}</span>`).join("") || '<span style="color:#64748b;font-size:.7rem">None (entry point / manual)</span>';
+
+  panel.innerHTML = `
+    <h4>${id}</h4>
+    <p>${n.desc}</p>
+    <div style="font-size:.7rem;font-weight:700;color:#93c5fd;margin-bottom:.35rem">→ Calls:</div>
+    <div class="detail-list">${callsTags}</div>
+    <div style="font-size:.7rem;font-weight:700;color:#6ee7b7;margin-bottom:.35rem">← Called By:</div>
+    <div class="detail-list">${calledByTags}</div>`;
+  panel.classList.add("show");
+});
+
+function deselectAll(){
+  selectedNode = null;
+  document.querySelectorAll(".node-card").forEach(c=>{c.classList.remove("dimmed","selected")});
+  document.getElementById("detail-panel").classList.remove("show");
+}
+
+// ═══ CALL GRAPH TREE ═══
+const tree = [
+  {name:"init", dot:"dot-events", children:[
+    {name:"initTheme", dot:"dot-logic"},
+    {name:"initDB", dot:"dot-data", children:[
+      {name:"indexedDB.open()", dot:"dot-data"},
+    ]},
+    {name:"generateSampleData", dot:"dot-logic", children:[
+      {name:"getAllTasks", dot:"dot-data"},
+      {name:"addTask ×6", dot:"dot-data"},
+      {name:"setSetting", dot:"dot-data"},
+    ]},
+    {name:"autoCarryForward", dot:"dot-logic", children:[
+      {name:"getSetting", dot:"dot-data"},
+      {name:"carryForward", dot:"dot-logic", children:[
+        {name:"getPreviousDay", dot:"dot-logic"},
+        {name:"getTasksByDate ×2", dot:"dot-data"},
+        {name:"generateTaskId", dot:"dot-logic"},
+        {name:"addTask ×N", dot:"dot-data"},
+        {name:"setSetting ×2", dot:"dot-data"},
+        {name:"showToast", dot:"dot-ui"},
+        {name:"renderProductivity", dot:"dot-render"},
+      ]},
+    ]},
+    {name:"renderProductivity", dot:"dot-render", children:[
+      {name:"getTasksByDate ×2", dot:"dot-data"},
+      {name:"renderCompactCard ×N", dot:"dot-render"},
+      {name:"emptyState", dot:"dot-render"},
+    ]},
+    {name:"attachCardEvents ×5", dot:"dot-events", children:[
+      {name:"quickStatusChange", dot:"dot-events", children:[
+        {name:"getTask", dot:"dot-data"},
+        {name:"updateTask", dot:"dot-data"},
+        {name:"refreshActiveView", dot:"dot-events", children:[
+          {name:"renderProductivity", dot:"dot-render"},
+          {name:"renderReports", dot:"dot-render"},
+          {name:"renderCalendar", dot:"dot-render", children:[
+            {name:"getAllTasks", dot:"dot-data"},
+            {name:"showDayDetail", dot:"dot-render"},
+          ]},
+        ]},
+      ]},
+      {name:"openTaskModal", dot:"dot-events"},
+      {name:"openDeleteModal", dot:"dot-events"},
+    ]},
+  ]}
+];
+
+function buildTree(items, depth=0){
+  let html = `<ul${depth>2?' class="collapsed"':''} style="max-height:${depth>2?0:9999}px;opacity:${depth>2?0:1}">`;
+  items.forEach(item=>{
+    const hasCh = item.children && item.children.length;
+    html += `<li>
+      <div class="tree-node" data-has-children="${hasCh?'yes':'no'}">
+        <span class="arrow ${hasCh?(depth<2?'open':''):''}"">${hasCh?'▶':' '}</span>
+        <span class="layer-dot ${item.dot}"></span>
+        <span class="fn-name">${item.name}</span>
+      </div>`;
+    if(hasCh) html += buildTree(item.children, depth+1);
+    html += `</li>`;
+  });
+  html += `</ul>`;
+  return html;
+}
+document.getElementById("call-tree").innerHTML = buildTree(tree);
+
+document.getElementById("call-tree").addEventListener("click", e=>{
+  const node = e.target.closest(".tree-node");
+  if(!node || node.dataset.hasChildren!=="yes") return;
+  const ul = node.nextElementSibling;
+  if(!ul) return;
+  const arrow = node.querySelector(".arrow");
+  const isCollapsed = ul.classList.contains("collapsed");
+  if(isCollapsed){
+    ul.classList.remove("collapsed");
+    ul.style.maxHeight = ul.scrollHeight+"px";
+    ul.style.opacity = "1";
+    arrow.classList.add("open");
+  } else {
+    ul.classList.add("collapsed");
+    ul.style.maxHeight = "0";
+    ul.style.opacity = "0";
+    arrow.classList.remove("open");
+  }
+});
+
+// ═══ DATA FLOWS ═══
+const flows = [
+  {title:"➕ Add Task",steps:[
+    {label:"Click + New Task",type:"user"},
+    {label:"openTaskModal()",type:"fn"},
+    {label:"Fill Form",type:"user"},
+    {label:"saveTask()",type:"fn"},
+    {label:"addTask(DB)",type:"db"},
+    {label:"refreshActiveView()",type:"fn"},
+    {label:"DOM Updated",type:"ui"}
+  ]},
+  {title:"✏️ Edit Task",steps:[
+    {label:"Click Card / Edit",type:"user"},
+    {label:"openTaskModal(id)",type:"fn"},
+    {label:"getTask(DB)",type:"db"},
+    {label:"Populate Form",type:"ui"},
+    {label:"saveTask()",type:"fn"},
+    {label:"updateTask(DB)",type:"db"},
+    {label:"refreshActiveView()",type:"fn"}
+  ]},
+  {title:"🗑️ Delete Task",steps:[
+    {label:"Click Delete",type:"user"},
+    {label:"openDeleteModal(id)",type:"fn"},
+    {label:"Confirm",type:"user"},
+    {label:"confirmDelete()",type:"fn"},
+    {label:"deleteTask(DB)",type:"db"},
+    {label:"refreshActiveView()",type:"fn"}
+  ]},
+  {title:"⚡ Carry Forward",steps:[
+    {label:"Page Load / Button",type:"user"},
+    {label:"autoCarryForward()",type:"fn"},
+    {label:"getSetting(DB)",type:"db"},
+    {label:"carryForward()",type:"fn"},
+    {label:"Clone Tasks",type:"fn"},
+    {label:"addTask ×N (DB)",type:"db"},
+    {label:"renderProductivity()",type:"fn"}
+  ]},
+  {title:"📥 Import Data",steps:[
+    {label:"Select .json File",type:"user"},
+    {label:"FileReader.parse()",type:"fn"},
+    {label:"Show Import Modal",type:"ui"},
+    {label:"Replace / Merge",type:"user"},
+    {label:"DB Operations",type:"db"},
+    {label:"refreshActiveView()",type:"fn"},
+    {label:"Toast Notification",type:"ui"}
+  ]},
+  {title:"🔄 Quick Status Change",steps:[
+    {label:"Change Dropdown",type:"user"},
+    {label:"quickStatusChange()",type:"fn"},
+    {label:"getTask(DB)",type:"db"},
+    {label:"updateTask(DB)",type:"db"},
+    {label:"refreshActiveView()",type:"fn"},
+    {label:"Toast",type:"ui"}
+  ]}
+];
+
+const stepClass={user:"step-user",fn:"step-fn",db:"step-db",ui:"step-ui"};
+const fc = document.getElementById("flow-container");
+flows.forEach(f=>{
+  let h = `<div class="flow"><div class="flow-title">${f.title}</div><div class="flow-steps">`;
+  f.steps.forEach((s,i)=>{
+    if(i>0) h += `<span class="flow-arrow">→</span>`;
+    h += `<div class="flow-step ${stepClass[s.type]}">${s.label}</div>`;
+  });
+  h += `</div></div>`;
+  fc.innerHTML += h;
+});
+
+// ═══ SCHEMA TABLE ═══
+const schema = [
+  {field:"taskId",type:"string",idx:true,cat:"auto",desc:"Unique identifier",ex:"T-001"},
+  {field:"title",type:"string",idx:false,cat:"required",desc:"Task description",ex:"Configure webhooks"},
+  {field:"category",type:"string",idx:true,cat:"required",desc:"Task category dropdown",ex:"Development"},
+  {field:"priority",type:"string",idx:true,cat:"required",desc:"Urgency level dropdown",ex:"High"},
+  {field:"status",type:"string",idx:true,cat:"required",desc:"Current state dropdown",ex:"In Progress"},
+  {field:"assignedTo",type:"string",idx:false,cat:"optional",desc:"Person responsible",ex:"Ashish Moghe"},
+  {field:"dueDate",type:"string",idx:true,cat:"optional",desc:"Target completion (YYYY-MM-DD)",ex:"2026-06-06"},
+  {field:"estimatedHours",type:"number",idx:false,cat:"optional",desc:"Planned effort",ex:"4"},
+  {field:"actualHours",type:"number",idx:false,cat:"optional",desc:"Real effort spent",ex:"2"},
+  {field:"notes",type:"string",idx:false,cat:"optional",desc:"Context, blockers, dependencies",ex:"Waiting for API keys"},
+  {field:"carriedFrom",type:"string",idx:false,cat:"auto",desc:"Origin date if carried forward",ex:"2026-06-05"},
+  {field:"carryForward",type:"boolean",idx:true,cat:"required",desc:"Flag for next-day carry",ex:"true"},
+  {field:"dateAssigned",type:"string",idx:true,cat:"auto",desc:'Virtual "sheet" date',ex:"2026-06-06"},
+  {field:"createdAt",type:"string",idx:false,cat:"auto",desc:"Creation timestamp",ex:"2026-06-06T10:..."},
+  {field:"updatedAt",type:"string",idx:false,cat:"auto",desc:"Last update timestamp",ex:"2026-06-06T12:..."},
+];
+
+const catClass={required:"field-required",auto:"field-auto",optional:"field-optional"};
+const catLabel={required:"Required",auto:"Auto-generated",optional:"Optional"};
+const sb = document.getElementById("schema-body");
+schema.forEach(s=>{
+  sb.innerHTML += `<tr>
+    <td><strong>${s.field}</strong></td>
+    <td style="color:#64748b">${s.type}</td>
+    <td>${s.idx?'<span class="idx-badge">✅ Indexed</span>':''}</td>
+    <td><span class="${catClass[s.cat]}">${catLabel[s.cat]}</span></td>
+    <td>${s.desc}</td>
+    <td style="color:#64748b;font-family:monospace;font-size:.7rem">${s.ex}</td>
+  </tr>`;
+});
+
+// ═══ SCROLL SPY ═══
+const sections = document.querySelectorAll(".section");
+const navLinks = document.querySelectorAll(".topnav a");
+const observer = new IntersectionObserver(entries=>{
+  entries.forEach(en=>{
+    if(en.isIntersecting){
+      navLinks.forEach(l=>l.classList.remove("active"));
+      const link = document.querySelector(`.topnav a[href="#${en.target.id}"]`);
+      if(link) link.classList.add("active");
+    }
+  });
+},{threshold:0.3,rootMargin:"-80px 0px -50% 0px"});
+sections.forEach(s=>observer.observe(s));
+</script>
+</body>
+</html>

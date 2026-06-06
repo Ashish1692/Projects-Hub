@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎯 TaskBoard — Productivity Dashboard</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="dark min-h-screen">
+
+  <!-- ======== Toast Container ======== -->
+  <div id="toast-container"></div>
+
+  <!-- ======== Header ======== -->
+  <header class="app-header border-b sticky top-0 z-40 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <!-- Left: Brand -->
+      <div>
+        <h1 class="text-2xl font-extrabold tracking-tight flex items-center gap-2">
+          🎯 <span>TaskBoard</span>
+        </h1>
+        <p class="subtitle text-xs mt-0.5">Personal Productivity Dashboard</p>
+      </div>
+      <!-- Center: Theme Toggle -->
+      <button id="btn-theme-toggle" class="theme-toggle" title="Toggle theme">
+        🌙
+      </button>
+      <!-- Right: Import / Export -->
+      <div class="flex items-center gap-3">
+        <!-- Hidden file input for import -->
+        <input type="file" id="import-file-input" accept=".json" class="hidden" />
+        <button id="btn-import"
+          class="nav-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border rounded-lg transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+          </svg>
+          Import
+        </button>
+        <button id="btn-export"
+          class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 6l-4-4m0 0L8 6m4-4v13"/>
+          </svg>
+          Export
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======== Tab Bar ======== -->
+  <nav class="app-nav border-b no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex gap-6">
+      <button class="tab-btn active py-3 text-sm font-semibold" data-tab="productivity">
+        🚀 Productivity
+      </button>
+      <button class="tab-btn py-3 text-sm font-semibold" data-tab="reports">
+        📊 Reports
+      </button>
+      <button class="tab-btn py-3 text-sm font-semibold" data-tab="calendar">
+        📅 Calendar
+      </button>
+    </div>
+  </nav>
+
+  <!-- ======== Main Content ======== -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ---- Tab 1: Productivity ---- -->
+    <div id="tab-productivity">
+      <!-- Date Navigation -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 no-print">
+        <!-- Left: Date controls -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="btn-prev-day"
+            class="nav-btn px-3 py-2 text-sm font-medium border rounded-lg transition">
+            ← Prev
+          </button>
+          <input type="date" id="date-picker"
+            class="px-3 py-2 text-sm font-medium border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
+          <button id="btn-today"
+            class="nav-btn-today px-3 py-2 text-sm font-semibold border rounded-lg transition">
+            Today
+          </button>
+          <button id="btn-next-day"
+            class="nav-btn px-3 py-2 text-sm font-medium border rounded-lg transition">
+            Next →
+          </button>
+        </div>
+        <!-- Right: Actions -->
+        <div class="flex items-center gap-2">
+          <button id="btn-new-task"
+            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Task
+          </button>
+          <button id="btn-carry-forward" class="btn-carry">
+            ⚡ Carry Forward
+          </button>
+        </div>
+      </div>
+
+      <!-- Current Date Label -->
+      <p id="current-date-label" class="date-label text-lg font-bold mb-5"></p>
+
+      <!-- Section: Today's In-Progress -->
+      <section id="section-inprogress" class="mb-8">
+        <h2 class="section-heading flex items-center gap-2 text-base font-bold mb-3">
+          🔥 Today's In-Progress
+          <span id="count-inprogress" class="section-count text-xs font-semibold">(0 tasks)</span>
+        </h2>
+        <div id="cards-inprogress" class="compact-grid" style="display:grid; grid-template-columns: repeat(3,1fr); gap:1rem;">
+        </div>
+      </section>
+
+      <!-- Section: Yesterday's Completed -->
+      <section id="section-completed" class="mb-8">
+        <h2 class="section-heading flex items-center gap-2 text-base font-bold mb-3">
+          ✅ Yesterday's Completed
+          <span id="count-completed" class="section-count text-xs font-semibold">(0 tasks)</span>
+        </h2>
+        <div id="cards-completed" class="compact-grid" style="display:grid; grid-template-columns: repeat(3,1fr); gap:1rem;">
+        </div>
+      </section>
+
+      <!-- Section: Pending / On Hold -->
+      <section id="section-pending" class="mb-8">
+        <h2 class="section-heading flex items-center gap-2 text-base font-bold mb-3">
+          ⏸️ Pending / On Hold
+          <span id="count-pending" class="section-count text-xs font-semibold">(0 tasks)</span>
+        </h2>
+        <div id="cards-pending" class="compact-grid" style="display:grid; grid-template-columns: repeat(3,1fr); gap:1rem;">
+        </div>
+      </section>
+
+      <!-- Section: Upcoming -->
+      <section id="section-upcoming" class="mb-8">
+        <h2 class="section-heading flex items-center gap-2 text-base font-bold mb-3">
+          📋 Upcoming
+          <span id="count-upcoming" class="section-count text-xs font-semibold">(0 tasks)</span>
+        </h2>
+        <div id="cards-upcoming" class="compact-grid" style="display:grid; grid-template-columns: repeat(3,1fr); gap:1rem;">
+        </div>
+      </section>
+    </div>
+
+    <!-- ---- Tab 2: Reports ---- -->
+    <div id="tab-reports" class="hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Monthly Summary -->
+        <div class="report-card rounded-xl shadow-sm border p-6 lg:col-span-2">
+          <h3 class="section-heading text-base font-bold mb-4">📊 Monthly Summary</h3>
+          <div id="report-summary"></div>
+        </div>
+        <!-- Daily Trend -->
+        <div class="report-card rounded-xl shadow-sm border p-6">
+          <h3 class="section-heading text-base font-bold mb-4">📈 Daily Trend — Completed Tasks</h3>
+          <div id="report-trend" class="space-y-2"></div>
+        </div>
+        <!-- By Category -->
+        <div class="report-card rounded-xl shadow-sm border p-6">
+          <h3 class="section-heading text-base font-bold mb-4">🏷️ Tasks by Category</h3>
+          <div id="report-category" class="space-y-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Tab 3: Calendar ---- -->
+    <div id="tab-calendar" class="hidden">
+      <!-- Calendar month navigation -->
+      <div class="calendar-nav no-print">
+        <button id="btn-cal-prev" class="nav-btn px-3 py-2 text-sm font-medium border rounded-lg transition">← Prev</button>
+        <h2 id="cal-month-label" class="calendar-month-label"></h2>
+        <button id="btn-cal-next" class="nav-btn px-3 py-2 text-sm font-medium border rounded-lg transition">Next →</button>
+      </div>
+
+      <!-- Legend -->
+      <div class="calendar-legend no-print">
+        <div class="calendar-legend-item"><span class="calendar-dot dot-inprogress"></span> In Progress</div>
+        <div class="calendar-legend-item"><span class="calendar-dot dot-completed"></span> Completed</div>
+        <div class="calendar-legend-item"><span class="calendar-dot dot-pending"></span> Pending</div>
+        <div class="calendar-legend-item"><span class="calendar-dot dot-onhold"></span> On Hold</div>
+      </div>
+
+      <!-- Calendar grid (rendered by JS) -->
+      <div id="calendar-grid" class="calendar-grid"></div>
+
+      <!-- Day detail panel (hidden until a day is clicked) -->
+      <div id="day-detail-panel" class="day-detail-panel" style="display:none;">
+        <div class="day-detail-header">
+          <h3 id="day-detail-title" class="day-detail-title"></h3>
+          <button id="day-detail-close" class="day-detail-close" title="Close">✕</button>
+        </div>
+        <div id="day-detail-tasks" class="day-task-list"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ======== Task Modal (Add / Edit) ======== -->
+  <div id="task-modal" class="modal-backdrop">
+    <div class="modal-content p-0">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b modal-divider">
+        <h2 id="modal-title" class="text-lg font-bold">Add Task</h2>
+        <button id="modal-close"
+          class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition icon-btn" style="border:none;">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <!-- Form -->
+      <form id="task-form" class="px-6 py-5 space-y-4">
+        <!-- Hidden ID -->
+        <input type="hidden" id="form-taskId" />
+
+        <!-- Title -->
+        <div>
+          <label for="form-title" class="block text-sm font-semibold mb-1">Task Title <span class="text-red-500">*</span></label>
+          <input type="text" id="form-title" required placeholder="e.g. Configure PagerDuty webhooks"
+            class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
+        </div>
+
+        <!-- Category + Priority row -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="form-category" class="block text-sm font-semibold mb-1">Category</label>
+            <select id="form-category"
+              class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+              <option value="Development">Development</option>
+              <option value="Testing">Testing</option>
+              <option value="Stakeholder">Stakeholder</option>
+              <option value="Meeting">Meeting</option>
+              <option value="Blocker">Blocker</option>
+              <option value="To-do">To-do</option>
+            </select>
+          </div>
+          <div>
+            <label for="form-priority" class="block text-sm font-semibold mb-1">Priority</label>
+            <select id="form-priority"
+              class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Status + Assigned To -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="form-status" class="block text-sm font-semibold mb-1">Status</label>
+            <select id="form-status"
+              class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+              <option value="In Progress">In Progress</option>
+              <option value="Pending">Pending</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div>
+            <label for="form-assignedTo" class="block text-sm font-semibold mb-1">Assigned To</label>
+            <input type="text" id="form-assignedTo" value="Ashish Moghe"
+              class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
+          </div>
+        </div>
+
+        <!-- Due Date + Hours row -->
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label for="form-dueDate" class="block text-sm font-semibold mb-1">Due Date</label>
+            <input type="date" id="form-dueDate"
+              class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
+          </div>
+          <div>
+            <label for="form-estimatedHours" class="block text-sm font-semibold mb-1">Est. Hours</label>
+            <input type="number" id="form-estimatedHours" min="0" step="0.5" placeholder="0"
+              class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
+          </div>
+          <div>
+            <label for="form-actualHours" class="block text-sm font-semibold mb-1">Actual Hours</label>
+            <input type="number" id="form-actualHours" min="0" step="0.5" placeholder="0"
+              class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label for="form-notes" class="block text-sm font-semibold mb-1">Notes / Blockers</label>
+          <textarea id="form-notes" rows="3" placeholder="Context, issues, dependencies…"
+            class="w-full px-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 resize-none"></textarea>
+        </div>
+
+        <!-- Carry Forward Toggle -->
+        <div class="cf-row flex items-center justify-between rounded-lg px-4 py-3">
+          <div>
+            <p class="text-sm font-semibold">Carry Forward</p>
+            <p class="text-xs section-count">Auto-move to next day if not completed</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="form-carryForward" class="sr-only peer" />
+            <div class="w-10 h-6 bg-gray-300 rounded-full peer peer-checked:bg-indigo-600 transition-colors
+                        after:content-[''] after:absolute after:top-[3px] after:left-[3px]
+                        after:bg-white after:rounded-full after:h-[18px] after:w-[18px]
+                        after:transition-all peer-checked:after:translate-x-4"></div>
+          </label>
+        </div>
+      </form>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t modal-divider">
+        <button id="btn-cancel-task"
+          class="btn-cancel px-4 py-2 text-sm font-semibold rounded-lg transition">
+          Cancel
+        </button>
+        <button id="btn-save-task"
+          class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-sm">
+          Save Task
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== Delete Confirm Modal ======== -->
+  <div id="delete-modal" class="modal-backdrop">
+    <div class="modal-content p-6 max-w-sm mx-auto text-center">
+      <input type="hidden" id="delete-taskId" />
+      <div class="delete-icon-wrap w-14 h-14 mx-auto mb-4 flex items-center justify-center rounded-full">
+        <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+      </div>
+      <h3 class="delete-heading text-lg font-bold mb-1">Delete Task?</h3>
+      <p class="delete-desc text-sm mb-5">This action cannot be undone. The task will be permanently removed.</p>
+      <div class="flex items-center justify-center gap-3">
+        <button id="btn-cancel-delete"
+          class="btn-cancel px-4 py-2 text-sm font-semibold rounded-lg transition">
+          Cancel
+        </button>
+        <button id="btn-confirm-delete"
+          class="px-5 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== Import Modal ======== -->
+  <div id="import-modal" class="modal-backdrop">
+    <div class="modal-content p-6 max-w-md mx-auto">
+      <h3 class="text-lg font-bold mb-1">Import Data</h3>
+      <p class="section-count text-sm mb-5">Choose how to handle the imported data:</p>
+      <div class="space-y-3 mb-5">
+        <button id="btn-import-replace"
+          class="import-option w-full text-left px-4 py-3 border rounded-xl transition">
+          <p class="text-sm font-bold">🔄 Replace All</p>
+          <p class="text-xs">Clear existing data and import fresh</p>
+        </button>
+        <button id="btn-import-merge"
+          class="import-option w-full text-left px-4 py-3 border rounded-xl transition">
+          <p class="text-sm font-bold">🔀 Merge</p>
+          <p class="text-xs">Add new tasks, skip duplicates by Task ID</p>
+        </button>
+      </div>
+      <button id="btn-cancel-import"
+        class="btn-cancel w-full px-4 py-2 text-sm font-semibold rounded-lg transition text-center">
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- ======== App Script ======== -->
+  <script src="app.js" defer></script>
+</body>
+</html>
