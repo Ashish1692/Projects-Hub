@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Projects Hub</title>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --primary-light: #a29bfe;
+            --bg: #0f0f1a;
+            --card-bg: #1a1a2e;
+            --card-hover: #222240;
+            --text: #e0e0e0;
+            --text-muted: #888;
+            --accent-green: #00cec9;
+            --accent-pink: #fd79a8;
+            --accent-yellow: #fdcb6e;
+            --accent-blue: #74b9ff;
+            --border: #2d2d4a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        header {
+            text-align: center;
+            padding: 60px 20px 40px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-bottom: 1px solid var(--border);
+        }
+        header h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary-light), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* ── Search & Filter ── */
+        .controls {
+            max-width: 1200px;
+            margin: 30px auto 10px;
+            padding: 0 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 220px;
+            padding: 12px 18px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .search-box:focus { border-color: var(--primary); }
+        .filter-btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        /* ── Project Grid ── */
+        .projects {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px 60px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--card-accent, var(--primary));
+        }
+        .card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 40px rgba(108, 92, 231, 0.15);
+            border-color: var(--primary);
+        }
+
+        .card-icon {
+            font-size: 2.2rem;
+            margin-bottom: 14px;
+        }
+        .card h2 {
+            font-size: 1.3rem;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        .card .description {
+            color: var(--text-muted);
+            font-size: 0.92rem;
+            line-height: 1.6;
+            flex: 1;
+            margin-bottom: 18px;
+        }
+        .card .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 18px;
+        }
+        .tag {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tag-html { background: #e17055; color: #fff; }
+        .tag-css  { background: #0984e3; color: #fff; }
+        .tag-js   { background: #fdcb6e; color: #2d3436; }
+        .tag-api  { background: #00cec9; color: #2d3436; }
+
+        .card-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+            align-self: flex-start;
+        }
+        .card-link:hover { background: var(--primary-light); }
+        .card-link svg { width: 16px; height: 16px; }
+
+        /* ── Footer ── */
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state span { font-size: 3rem; display: block; margin-bottom: 10px; }
+
+        /* ── Responsive ── */
+        @media (max-width: 600px) {
+            header h1 { font-size: 2rem; }
+            .projects { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🚀 My Projects Hub</h1>
+    <p>A collection of all my HTML/CSS/JS projects — hosted from a single repository.</p>
+</header>
+
+<div class="controls">
+    <input type="text" class="search-box" id="searchBox" placeholder="🔍  Search projects..." />
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="html">HTML</button>
+    <button class="filter-btn" data-filter="css">CSS</button>
+    <button class="filter-btn" data-filter="js">JavaScript</button>
+</div>
+
+<div class="projects" id="projectGrid">
+
+    <!--
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  HOW TO ADD A NEW PROJECT:                                   ║
+    ║                                                              ║
+    ║  1. Create a new folder: /your-project-name/index.html       ║
+    ║  2. Copy a <div class="card"> block below                    ║
+    ║  3. Update: title, description, tags, link, icon, accent     ║
+    ║  4. Push to GitHub — done!                                   ║
+    ╚══════════════════════════════════════════════════════════════╝
+    -->
+
+    <!-- ── Project 1: Calculator ── -->
+    <div class="card" style="--card-accent: #00cec9;" data-tags="html,css,js">
+        <div class="card-icon">🧮</div>
+        <h2>Calculator</h2>
+        <p class="description">A sleek, responsive calculator built with vanilla JavaScript. Supports basic arithmetic operations with a modern dark UI.</p>
+        <div class="tags">
+            <span class="tag tag-html">HTML</span>
+            <span class="tag tag-css">CSS</span>
+            <span class="tag tag-js">JS</span>
+        </div>
+        <a href="./project-calculator/index.html" class="card-link">
+            Open Project
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
+    </div>
+
+    <!-- ── Project 2: To-Do App ── -->
+    <div class="card" style="--card-accent: #fd79a8;" data-tags="html,css,js">
+        <div class="card-icon">✅</div>
+        <h2>To-Do App</h2>
+        <p class="description">A minimal to-do list application with local storage persistence. Add, complete, and delete tasks effortlessly.</p>
+        <div class="tags">
+            <span class="tag tag-html">HTML</span>
+            <span class="tag tag-css">CSS</span>
+            <span class="tag tag-js">JS</span>
+        </div>
+        <a href="./project-todo-app/index.html" class="card-link">
+            Open Project
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
+    </div>
+
+    <!-- ── Project 3: Placeholder ── -->
+    <div class="card" style="--card-accent: #fdcb6e;" data-tags="html,css">
+        <div class="card-icon">🎨</div>
+        <h2>Your Next Project</h2>
+        <p class="description">Add your next project here! Just create a folder, drop in an index.html, and update this card with the details.</p>
+        <div class="tags">
+            <span class="tag tag-html">HTML</span>
+            <span class="tag tag-css">CSS</span>
+        </div>
+        <a href="#" class="card-link">
+            Coming Soon
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
+    </div>
+
+</div>
+
+<footer>
+    <p>Built with ❤️ | Hosted on GitHub Pages</p>
+</footer>
+
+<script>
+    // ── Search ──
+    const searchBox = document.getElementById('searchBox');
+    const cards = document.querySelectorAll('.card');
+
+    searchBox.addEventListener('input', () => {
+        const query = searchBox.value.toLowerCase();
+        cards.forEach(card => {
+            const text = card.textContent.toLowerCase();
+            card.style.display = text.includes(query) ? '' : 'none';
+        });
+        checkEmpty();
+    });
+
+    // ── Filter ──
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const filter = btn.dataset.filter;
+            cards.forEach(card => {
+                if (filter === 'all') {
+                    card.style.display = '';
+                } else {
+                    const tags = card.dataset.tags || '';
+                    card.style.display = tags.includes(filter) ? '' : 'none';
+                }
+            });
+            checkEmpty();
+        });
+    });
+
+    // ── Empty State ──
+    function checkEmpty() {
+        const grid = document.getElementById('projectGrid');
+        let existing = grid.querySelector('.empty-state');
+        const visible = [...cards].filter(c => c.style.display !== 'none');
+        if (visible.length === 0 && !existing) {
+            const div = document.createElement('div');
+            div.className = 'empty-state';
+            div.innerHTML = '<span>🔍</span><p>No projects match your search.</p>';
+            grid.appendChild(div);
+        } else if (visible.length > 0 && existing) {
+            existing.remove();
+        }
+    }
+</script>
+
+</body>
+</html>
