@@ -1,1080 +1,1643 @@
 /* ============================================================
    TaskBoard — app.js
-   Complete application logic: IndexedDB, rendering, automation
-   Dark mode default · Compact grid · Calendar view
+   Complete application logic + Isolated Reminders Module
    ============================================================ */
 
-// ─── Constants ───────────────────────────────────────────────
-const DB_NAME    = "TaskBoardDB";
-const DB_VERSION = 1;
-const CATEGORIES = ["Development","Testing","Stakeholder","Meeting","Blocker","To-do"];
-const PRIORITIES = ["Critical","High","Medium","Low"];
-const STATUSES   = ["In Progress","Pending","On Hold","Completed"];
+// ─── Tailwind 8xl extension ──────────────────────────────────
+const _s = document.createElement("style");
+_s.textContent = ".max-w-8xl{max-width:88rem}";
+document.head.appendChild(_s);
 
+// ─── Constants ───────────────────────────────────────────────
+const DB_NAME = "TaskBoardDB",
+	DB_VERSION = 1;
+const CATEGORIES = [
+	"Development",
+	"Testing",
+	"Stakeholder",
+	"Meeting",
+	"Blocker",
+	"To-do",
+];
+const PRIORITIES = ["Critical", "High", "Medium", "Low"];
+const STATUSES = ["In Progress", "Pending", "On Hold", "Completed"];
 const CATEGORY_COLORS = {
-  Development: "bg-blue-500",
-  Testing:     "bg-teal-500",
-  Stakeholder: "bg-purple-500",
-  Meeting:     "bg-indigo-500",
-  Blocker:     "bg-red-500",
-  "To-do":     "bg-amber-500"
+	Development: "bg-blue-500",
+	Testing: "bg-teal-500",
+	Stakeholder: "bg-purple-500",
+	Meeting: "bg-indigo-500",
+	Blocker: "bg-red-500",
+	"To-do": "bg-amber-500",
 };
 
 // ─── State ───────────────────────────────────────────────────
-let db             = null;
-let currentDate    = todayStr();
-let activeTab      = "productivity";
-let importedData   = null;       // temp holder for import flow
-let calendarMonth  = new Date(); // tracks which month is displayed
-let selectedCalDay = null;       // tracks selected day in calendar
+let db = null,
+	currentDate = todayStr(),
+	activeTab = "productivity",
+	importedData = null;
+let calendarMonth = new Date(),
+	selectedCalDay = null;
 
-// ─── Helpers — Dates ─────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────
 function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+	const d = new Date();
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
-function formatDate(dateStr) {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { weekday:"long", day:"2-digit", month:"short", year:"numeric" });
+function formatDate(s) {
+	if (!s) return "—";
+	const d = new Date(s + "T00:00:00");
+	return d.toLocaleDateString("en-US", {
+		weekday: "long",
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+	});
 }
-
-function formatDateShort(dateStr) {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month:"short", day:"2-digit" });
+function formatDateShort(s) {
+	if (!s) return "—";
+	const d = new Date(s + "T00:00:00");
+	return d.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
 }
-
-function getPreviousDay(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() - 1);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function getPreviousDay(s) {
+	const d = new Date(s + "T00:00:00");
+	d.setDate(d.getDate() - 1);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
-function getNextDay(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + 1);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function getNextDay(s) {
+	const d = new Date(s + "T00:00:00");
+	d.setDate(d.getDate() + 1);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
-function getMonthRange(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  const y = d.getFullYear(), m = d.getMonth();
-  const start = `${y}-${String(m+1).padStart(2,"0")}-01`;
-  const last  = new Date(y, m+1, 0).getDate();
-  const end   = `${y}-${String(m+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
-  return { start, end };
+function getMonthRange(s) {
+	const d = new Date(s + "T00:00:00"),
+		y = d.getFullYear(),
+		m = d.getMonth();
+	const start = `${y}-${String(m + 1).padStart(2, "0")}-01`,
+		last = new Date(y, m + 1, 0).getDate(),
+		end = `${y}-${String(m + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+	return { start, end };
 }
-
 function toDateStr(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
-function generateTaskId(counter) {
-  return "T-" + String(counter).padStart(3, "0");
+function generateTaskId(c) {
+	return "T-" + String(c).padStart(3, "0");
 }
-
-function nowISO() { return new Date().toISOString(); }
-
-// ─── Helpers — Badge classes ─────────────────────────────────
+function nowISO() {
+	return new Date().toISOString();
+}
 function getPriorityBorderClass(p) {
-  return { Critical:"border-priority-critical", High:"border-priority-high",
-           Medium:"border-priority-medium", Low:"border-priority-low" }[p] || "";
+	return (
+		{
+			Critical: "border-priority-critical",
+			High: "border-priority-high",
+			Medium: "border-priority-medium",
+			Low: "border-priority-low",
+		}[p] || ""
+	);
 }
 function getPriorityBadgeClass(p) {
-  return { Critical:"badge-critical", High:"badge-high",
-           Medium:"badge-medium", Low:"badge-low" }[p] || "";
+	return (
+		{
+			Critical: "badge-critical",
+			High: "badge-high",
+			Medium: "badge-medium",
+			Low: "badge-low",
+		}[p] || ""
+	);
 }
 function getStatusBadgeClass(s) {
-  return { "Completed":"badge-completed", "In Progress":"badge-inprogress",
-           "Pending":"badge-pending", "On Hold":"badge-onhold" }[s] || "";
+	return (
+		{
+			Completed: "badge-completed",
+			"In Progress": "badge-inprogress",
+			Pending: "badge-pending",
+			"On Hold": "badge-onhold",
+		}[s] || ""
+	);
 }
 function getCategoryBadgeClass(c) {
-  return { Development:"badge-development", Testing:"badge-testing",
-           Stakeholder:"badge-stakeholder", Meeting:"badge-meeting",
-           Blocker:"badge-blocker", "To-do":"badge-todo" }[c] || "";
+	return (
+		{
+			Development: "badge-development",
+			Testing: "badge-testing",
+			Stakeholder: "badge-stakeholder",
+			Meeting: "badge-meeting",
+			Blocker: "badge-blocker",
+			"To-do": "badge-todo",
+		}[c] || ""
+	);
 }
 function getStatusDotClass(s) {
-  return { "Completed":"dot-completed", "In Progress":"dot-inprogress",
-           "Pending":"dot-pending", "On Hold":"dot-onhold" }[s] || "";
+	return (
+		{
+			Completed: "dot-completed",
+			"In Progress": "dot-inprogress",
+			Pending: "dot-pending",
+			"On Hold": "dot-onhold",
+		}[s] || ""
+	);
 }
 
 // ─── IndexedDB Layer ─────────────────────────────────────────
 function initDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const database = e.target.result;
-      if (!database.objectStoreNames.contains("tasks")) {
-        const store = database.createObjectStore("tasks", { keyPath: "taskId" });
-        store.createIndex("category",     "category",     { unique: false });
-        store.createIndex("priority",     "priority",     { unique: false });
-        store.createIndex("status",       "status",       { unique: false });
-        store.createIndex("dueDate",      "dueDate",      { unique: false });
-        store.createIndex("carryForward", "carryForward",  { unique: false });
-        store.createIndex("dateAssigned", "dateAssigned",  { unique: false });
-      }
-      if (!database.objectStoreNames.contains("settings")) {
-        database.createObjectStore("settings", { keyPath: "key" });
-      }
-    };
-    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
-    req.onerror   = (e) => reject(e.target.error);
-  });
+	return new Promise((res, rej) => {
+		const r = indexedDB.open(DB_NAME, DB_VERSION);
+		r.onupgradeneeded = (e) => {
+			const d = e.target.result;
+			if (!d.objectStoreNames.contains("tasks")) {
+				const s = d.createObjectStore("tasks", { keyPath: "taskId" });
+				s.createIndex("category", "category", { unique: false });
+				s.createIndex("priority", "priority", { unique: false });
+				s.createIndex("status", "status", { unique: false });
+				s.createIndex("dueDate", "dueDate", { unique: false });
+				s.createIndex("carryForward", "carryForward", {
+					unique: false,
+				});
+				s.createIndex("dateAssigned", "dateAssigned", {
+					unique: false,
+				});
+			}
+			if (!d.objectStoreNames.contains("settings"))
+				d.createObjectStore("settings", { keyPath: "key" });
+		};
+		r.onsuccess = (e) => {
+			db = e.target.result;
+			res(db);
+		};
+		r.onerror = (e) => rej(e.target.error);
+	});
 }
-
-function dbTx(storeName, mode = "readonly") {
-  const tx = db.transaction(storeName, mode);
-  return tx.objectStore(storeName);
+function dbTx(s, m = "readonly") {
+	return db.transaction(s, m).objectStore(s);
 }
-
-function addTask(task) {
-  return new Promise((res, rej) => {
-    const r = dbTx("tasks","readwrite").put(task);
-    r.onsuccess = () => res(r.result);
-    r.onerror   = () => rej(r.error);
-  });
+function addTask(t) {
+	return new Promise((r, j) => {
+		const q = dbTx("tasks", "readwrite").put(t);
+		q.onsuccess = () => r(q.result);
+		q.onerror = () => j(q.error);
+	});
 }
 const updateTask = addTask;
-
-function deleteTask(taskId) {
-  return new Promise((res, rej) => {
-    const r = dbTx("tasks","readwrite").delete(taskId);
-    r.onsuccess = () => res();
-    r.onerror   = () => rej(r.error);
-  });
+function deleteTask(id) {
+	return new Promise((r, j) => {
+		const q = dbTx("tasks", "readwrite").delete(id);
+		q.onsuccess = () => r();
+		q.onerror = () => j(q.error);
+	});
 }
-
-function getTask(taskId) {
-  return new Promise((res, rej) => {
-    const r = dbTx("tasks").get(taskId);
-    r.onsuccess = () => res(r.result);
-    r.onerror   = () => rej(r.error);
-  });
+function getTask(id) {
+	return new Promise((r, j) => {
+		const q = dbTx("tasks").get(id);
+		q.onsuccess = () => r(q.result);
+		q.onerror = () => j(q.error);
+	});
 }
-
-function getTasksByDate(dateStr) {
-  return new Promise((res, rej) => {
-    const idx = dbTx("tasks").index("dateAssigned");
-    const r = idx.getAll(dateStr);
-    r.onsuccess = () => res(r.result || []);
-    r.onerror   = () => rej(r.error);
-  });
+function getTasksByDate(d) {
+	return new Promise((r, j) => {
+		const q = dbTx("tasks").index("dateAssigned").getAll(d);
+		q.onsuccess = () => r(q.result || []);
+		q.onerror = () => j(q.error);
+	});
 }
-
 function getAllTasks() {
-  return new Promise((res, rej) => {
-    const r = dbTx("tasks").getAll();
-    r.onsuccess = () => res(r.result || []);
-    r.onerror   = () => rej(r.error);
-  });
+	return new Promise((r, j) => {
+		const q = dbTx("tasks").getAll();
+		q.onsuccess = () => r(q.result || []);
+		q.onerror = () => j(q.error);
+	});
 }
-
 function clearAllTasks() {
-  return new Promise((res, rej) => {
-    const r = dbTx("tasks","readwrite").clear();
-    r.onsuccess = () => res();
-    r.onerror   = () => rej(r.error);
-  });
+	return new Promise((r, j) => {
+		const q = dbTx("tasks", "readwrite").clear();
+		q.onsuccess = () => r();
+		q.onerror = () => j(q.error);
+	});
+}
+function getSetting(k) {
+	return new Promise((r, j) => {
+		const q = dbTx("settings").get(k);
+		q.onsuccess = () => r(q.result ? q.result.value : null);
+		q.onerror = () => j(q.error);
+	});
+}
+function setSetting(k, v) {
+	return new Promise((r, j) => {
+		const q = dbTx("settings", "readwrite").put({ key: k, value: v });
+		q.onsuccess = () => r();
+		q.onerror = () => j(q.error);
+	});
 }
 
-function getSetting(key) {
-  return new Promise((res, rej) => {
-    const r = dbTx("settings").get(key);
-    r.onsuccess = () => res(r.result ? r.result.value : null);
-    r.onerror   = () => rej(r.error);
-  });
-}
-
-function setSetting(key, value) {
-  return new Promise((res, rej) => {
-    const r = dbTx("settings","readwrite").put({ key, value });
-    r.onsuccess = () => res();
-    r.onerror   = () => rej(r.error);
-  });
-}
-
-// ─── Toast System ────────────────────────────────────────────
-function showToast(message, type = "info") {
-  const container = document.getElementById("toast-container");
-  const el = document.createElement("div");
-  el.className = `toast ${type}`;
-  el.textContent = message;
-  container.appendChild(el);
-  setTimeout(() => { el.remove(); }, 3000);
+// ─── Toast ───────────────────────────────────────────────────
+function showToast(msg, type = "info") {
+	const c = document.getElementById("toast-container"),
+		el = document.createElement("div");
+	el.className = `toast ${type}`;
+	el.textContent = msg;
+	c.appendChild(el);
+	setTimeout(() => el.remove(), 3000);
 }
 
 // ─── Card Rendering ──────────────────────────────────────────
-
-function statusOptions(current) {
-  return STATUSES.map(s =>
-    `<option value="${s}" ${s===current?"selected":""}>${s}</option>`
-  ).join("");
+function statusOptions(cur) {
+	return STATUSES.map(
+		(s) =>
+			`<option value="${s}" ${s === cur ? "selected" : ""}>${s}</option>`,
+	).join("");
+}
+function escapeHtml(s) {
+	if (!s) return "";
+	return s
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#039;");
 }
 
-function escapeHtml(str) {
-  if (!str) return "";
-  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-            .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
-}
-
-/**
- * Large card — kept for future use (detail views, etc.)
- */
 function renderLargeCard(task) {
-  const borderClass = getPriorityBorderClass(task.priority);
-  const priBadge    = getPriorityBadgeClass(task.priority);
-  const catBadge    = getCategoryBadgeClass(task.category);
-  const carriedHtml = task.carriedFrom
-    ? `<span class="carry-badge">🔄 Carried from ${formatDateShort(task.carriedFrom)}</span>` : "";
-
-  const notesHtml = task.notes
-    ? `<p class="card-notes text-sm italic mt-2 leading-relaxed">${escapeHtml(task.notes)}</p>` : "";
-
-  return `
-  <div class="task-card rounded-xl shadow-sm border ${borderClass} p-5 sm:p-6">
-    <div class="flex flex-wrap items-center gap-2 mb-2">
-      <span class="card-id text-xs font-bold">${task.taskId}</span>
-      <span class="badge ${priBadge}">${task.priority}</span>
-      <span class="badge ${catBadge}">${task.category}</span>
-      ${carriedHtml}
-    </div>
-    <h3 class="card-title text-lg font-bold mb-2">${escapeHtml(task.title)}</h3>
-    <div class="flex flex-wrap items-center gap-4 text-xs card-meta mb-1">
-      <span>📅 Due: <strong>${formatDateShort(task.dueDate)}</strong></span>
-      <span>⏱ Est: <strong>${task.estimatedHours ?? 0}h</strong></span>
-      <span>⏳ Actual: <strong>${task.actualHours ?? 0}h</strong></span>
-      <span>👤 ${escapeHtml(task.assignedTo || "—")}</span>
-    </div>
-    ${notesHtml}
-    <div class="flex items-center gap-2 mt-4 pt-3 border-t card-divider">
-      <select class="inline-select status-select" data-taskid="${task.taskId}">
-        ${statusOptions(task.status)}
-      </select>
-      <button class="icon-btn btn-edit" data-taskid="${task.taskId}" title="Edit">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-        </svg>
-      </button>
-      <button class="icon-btn danger btn-delete" data-taskid="${task.taskId}" title="Delete">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-        </svg>
-      </button>
-    </div>
-  </div>`;
+	const bc = getPriorityBorderClass(task.priority),
+		pb = getPriorityBadgeClass(task.priority),
+		cb = getCategoryBadgeClass(task.category);
+	const ch = task.carriedFrom
+		? `<span class="carry-badge">🔄 Carried from ${formatDateShort(task.carriedFrom)}</span>`
+		: "";
+	const nh = task.notes
+		? `<p class="card-notes text-sm italic mt-2 leading-relaxed">${escapeHtml(task.notes)}</p>`
+		: "";
+	return `<div class="task-card rounded-xl shadow-sm border ${bc} p-5 sm:p-6"><div class="flex flex-wrap items-center gap-2 mb-2"><span class="card-id text-xs font-bold">${task.taskId}</span><span class="badge ${pb}">${task.priority}</span><span class="badge ${cb}">${task.category}</span>${ch}</div><h3 class="card-title text-lg font-bold mb-2">${escapeHtml(task.title)}</h3><div class="flex flex-wrap items-center gap-4 text-xs card-meta mb-1"><span>📅 Due: <strong>${formatDateShort(task.dueDate)}</strong></span><span>⏱ Est: <strong>${task.estimatedHours ?? 0}h</strong></span><span>⏳ Actual: <strong>${task.actualHours ?? 0}h</strong></span><span>👤 ${escapeHtml(task.assignedTo || "—")}</span></div>${nh}<div class="flex items-center gap-2 mt-4 pt-3 border-t card-divider"><select class="inline-select status-select" data-taskid="${task.taskId}">${statusOptions(task.status)}</select><button class="icon-btn btn-edit" data-taskid="${task.taskId}" title="Edit"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button><button class="icon-btn danger btn-delete" data-taskid="${task.taskId}" title="Delete"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
 }
 
-/**
- * Compact card — used for ALL sections
- */
 function renderCompactCard(task) {
-  const borderClass = getPriorityBorderClass(task.priority);
-  const priBadge = getPriorityBadgeClass(task.priority);
-  const catBadge = getCategoryBadgeClass(task.category);
-  const stBadge  = getStatusBadgeClass(task.status);
-  const carriedHtml = task.carriedFrom
-    ? `<span class="carry-badge">🔄 ${formatDateShort(task.carriedFrom)}</span>` : "";
-
-  const notesHtml = task.notes
-    ? `<p class="card-notes text-xs italic mt-2 line-clamp-2">${escapeHtml(task.notes)}</p>` : "";
-
-  return `
-  <div class="task-card compact-card rounded-xl shadow-sm border ${borderClass} p-4 cursor-pointer transition"
-       data-taskid="${task.taskId}">
-    <div class="flex items-center gap-2 mb-2 flex-wrap">
-      <span class="card-id text-xs font-bold">${task.taskId}</span>
-      <span class="badge ${priBadge}">${task.priority}</span>
-      <span class="badge ${stBadge}">${task.status}</span>
-      ${carriedHtml}
-    </div>
-    <h4 class="card-title text-sm font-semibold line-clamp-2 mb-2">${escapeHtml(task.title)}</h4>
-    ${notesHtml}
-    <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
-      <span class="badge ${catBadge}">${task.category}</span>
-      <span class="card-meta">📅 ${formatDateShort(task.dueDate)}</span>
-      <span class="card-meta">⏱ ${task.estimatedHours ?? 0}h</span>
-    </div>
-    <!-- Quick actions row -->
-    <div class="flex items-center gap-2 mt-3 pt-2 border-t card-divider">
-      <select class="inline-select status-select flex-1" data-taskid="${task.taskId}"
-              onclick="event.stopPropagation()">
-        ${statusOptions(task.status)}
-      </select>
-      <button class="icon-btn btn-edit" data-taskid="${task.taskId}" title="Edit"
-              onclick="event.stopPropagation()">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-        </svg>
-      </button>
-      <button class="icon-btn danger btn-delete" data-taskid="${task.taskId}" title="Delete"
-              onclick="event.stopPropagation()">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-        </svg>
-      </button>
-    </div>
-  </div>`;
+	const bc = getPriorityBorderClass(task.priority),
+		pb = getPriorityBadgeClass(task.priority),
+		sb = getStatusBadgeClass(task.status),
+		cb = getCategoryBadgeClass(task.category);
+	const ch = task.carriedFrom
+		? `<span class="carry-badge">🔄 ${formatDateShort(task.carriedFrom)}</span>`
+		: "";
+	const nh = task.notes
+		? `<p class="card-notes text-xs italic mt-2 line-clamp-2">${escapeHtml(task.notes)}</p>`
+		: "";
+	return `<div class="task-card compact-card rounded-xl shadow-sm border ${bc} p-4 cursor-pointer transition" data-taskid="${task.taskId}"><div class="flex items-center gap-2 mb-2 flex-wrap"><span class="card-id text-xs font-bold">${task.taskId}</span><span class="badge ${pb}">${task.priority}</span><!--<span class="badge ${sb}">${task.status}</span>--><span class="badge ${cb}">${task.category}</span>${ch}</div><h4 class="card-title text-sm font-semibold line-clamp-2 mb-2">${escapeHtml(task.title)}</h4>${nh}<div class="flex flex-wrap items-center gap-2 text-xs mt-2"><span class="card-meta">📅 ${formatDateShort(task.dueDate)}</span><span class="card-meta">⏱ ${task.estimatedHours ?? 0}h</span></div><div class="flex items-center gap-2 mt-3 pt-2 border-t card-divider"><select class="inline-select status-select flex-1" data-taskid="${task.taskId}" onclick="event.stopPropagation()">${statusOptions(task.status)}</select><button class="icon-btn btn-edit" data-taskid="${task.taskId}" title="Edit" onclick="event.stopPropagation()"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button><button class="icon-btn danger btn-delete" data-taskid="${task.taskId}" title="Delete" onclick="event.stopPropagation()"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
 }
 
 function emptyState(msg) {
-  return `<div class="empty-state">${msg}</div>`;
+	return `<div class="empty-state">${msg}</div>`;
 }
 
-// ─── Render: Productivity Tab ────────────────────────────────
+// ─── Render: Productivity (Kanban) ───────────────────────────
 async function renderProductivity() {
-  const todayTasks     = await getTasksByDate(currentDate);
-  const yesterdayDate  = getPreviousDay(currentDate);
-  const yesterdayTasks = await getTasksByDate(yesterdayDate);
-
-  // Filter
-  const inProgress = todayTasks.filter(t => t.status === "In Progress");
-  const completed  = yesterdayTasks.filter(t => t.status === "Completed");
-  const pending    = todayTasks.filter(t => t.status === "Pending" || t.status === "On Hold");
-  const upcoming   = todayTasks.filter(t =>
-    (t.status === "Pending" || t.status === "In Progress") && t.dueDate > currentDate
-  );
-
-  // Render In-Progress (compact cards)
-  const ipContainer = document.getElementById("cards-inprogress");
-  ipContainer.innerHTML = inProgress.length
-    ? inProgress.map(renderCompactCard).join("")
-    : emptyState("🎯 No tasks in progress. Start something!");
-  document.getElementById("count-inprogress").textContent = `(${inProgress.length} task${inProgress.length!==1?"s":""})`;
-
-  // Render Yesterday's Completed (compact cards)
-  const cContainer = document.getElementById("cards-completed");
-  cContainer.innerHTML = completed.length
-    ? completed.map(renderCompactCard).join("")
-    : emptyState("📭 No completed tasks from yesterday");
-  document.getElementById("count-completed").textContent = `(${completed.length} task${completed.length!==1?"s":""})`;
-
-  // Render Pending / On Hold (compact cards)
-  const pContainer = document.getElementById("cards-pending");
-  pContainer.innerHTML = pending.length
-    ? pending.map(renderCompactCard).join("")
-    : emptyState("✨ All clear! No pending or blocked tasks");
-  document.getElementById("count-pending").textContent = `(${pending.length} task${pending.length!==1?"s":""})`;
-
-  // Render Upcoming (compact cards)
-  const uContainer = document.getElementById("cards-upcoming");
-  uContainer.innerHTML = upcoming.length
-    ? upcoming.map(renderCompactCard).join("")
-    : emptyState("📅 No upcoming tasks scheduled");
-  document.getElementById("count-upcoming").textContent = `(${upcoming.length} task${upcoming.length!==1?"s":""})`;
-
-  // Date label
-  document.getElementById("current-date-label").textContent = formatDate(currentDate);
-  document.getElementById("date-picker").value = currentDate;
+	const tt = await getTasksByDate(currentDate),
+		yd = getPreviousDay(currentDate),
+		yt = await getTasksByDate(yd);
+	const ip = tt.filter((t) => t.status === "In Progress"),
+		co = yt.filter((t) => t.status === "Completed"),
+		pe = tt.filter((t) => t.status === "Pending" || t.status === "On Hold"),
+		up = tt.filter(
+			(t) =>
+				(t.status === "Pending" || t.status === "In Progress") &&
+				t.dueDate > currentDate,
+		);
+	document.getElementById("cards-inprogress").innerHTML = ip.length
+		? ip.map(renderCompactCard).join("")
+		: emptyState("🎯 No tasks in progress");
+	document.getElementById("count-inprogress").textContent = ip.length;
+	document.getElementById("cards-completed").innerHTML = co.length
+		? co.map(renderCompactCard).join("")
+		: emptyState("📭 No completed tasks");
+	document.getElementById("count-completed").textContent = co.length;
+	document.getElementById("cards-pending").innerHTML = pe.length
+		? pe.map(renderCompactCard).join("")
+		: emptyState("✨ All clear!");
+	document.getElementById("count-pending").textContent = pe.length;
+	document.getElementById("cards-upcoming").innerHTML = up.length
+		? up.map(renderCompactCard).join("")
+		: emptyState("📅 No upcoming tasks");
+	document.getElementById("count-upcoming").textContent = up.length;
+	document.getElementById("current-date-label").textContent =
+		formatDate(currentDate);
+	document.getElementById("date-picker").value = currentDate;
 }
 
-// ─── Render: Reports Tab ─────────────────────────────────────
+// ─── Render: Reports ─────────────────────────────────────────
 async function renderReports() {
-  const { start, end } = getMonthRange(currentDate);
-  const allTasks = await getAllTasks();
-  const monthTasks = allTasks.filter(t => t.dateAssigned >= start && t.dateAssigned <= end);
-
-  // --- Monthly Summary ---
-  const total = monthTasks.length;
-  const counts = { Completed:0, "In Progress":0, Pending:0, "On Hold":0 };
-  monthTasks.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
-
-  const summaryColors = {
-    Completed:   "bg-emerald-500",
-    "In Progress":"bg-blue-500",
-    Pending:     "bg-purple-500",
-    "On Hold":   "bg-slate-400"
-  };
-
-  let summaryHtml = `<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-    <div class="report-stat-card text-center p-4 rounded-xl">
-      <p class="text-3xl font-extrabold">${total}</p>
-      <p class="card-meta text-xs font-semibold mt-1">Total Tasks</p>
-    </div>
-    <div class="report-stat-card text-center p-4 rounded-xl">
-      <p class="text-3xl font-extrabold" style="color:#10b981">${counts.Completed}</p>
-      <p class="card-meta text-xs font-semibold mt-1">Completed</p>
-    </div>
-    <div class="report-stat-card text-center p-4 rounded-xl">
-      <p class="text-3xl font-extrabold" style="color:#3b82f6">${counts["In Progress"]}</p>
-      <p class="card-meta text-xs font-semibold mt-1">In Progress</p>
-    </div>
-    <div class="report-stat-card text-center p-4 rounded-xl">
-      <p class="text-3xl font-extrabold" style="color:#8b5cf6">${counts.Pending + counts["On Hold"]}</p>
-      <p class="card-meta text-xs font-semibold mt-1">Pending / On Hold</p>
-    </div>
-  </div>`;
-
-  summaryHtml += `<div class="space-y-3">`;
-  for (const [status, count] of Object.entries(counts)) {
-    const pct = total ? Math.round((count / total) * 100) : 0;
-    summaryHtml += `
-    <div class="flex items-center gap-3">
-      <span class="card-meta text-xs font-semibold w-24">${status}</span>
-      <div class="flex-1 chart-track rounded-full h-6 overflow-hidden">
-        <div class="chart-bar ${summaryColors[status]} h-full" style="width:${pct}%"></div>
-      </div>
-      <span class="card-meta text-xs font-bold w-12 text-right">${count} (${pct}%)</span>
-    </div>`;
-  }
-  summaryHtml += `</div>`;
-  document.getElementById("report-summary").innerHTML = total
-    ? summaryHtml
-    : emptyState("📭 No tasks this month yet");
-
-  // --- Daily Trend ---
-  const dailyCompleted = {};
-  monthTasks.filter(t => t.status === "Completed").forEach(t => {
-    dailyCompleted[t.dateAssigned] = (dailyCompleted[t.dateAssigned] || 0) + 1;
-  });
-  const maxDaily = Math.max(1, ...Object.values(dailyCompleted));
-  const sortedDays = Object.keys(dailyCompleted).sort();
-
-  let trendHtml = "";
-  if (sortedDays.length === 0) {
-    trendHtml = emptyState("📭 No completed tasks this month");
-  } else {
-    sortedDays.forEach(day => {
-      const c = dailyCompleted[day];
-      const pct = Math.round((c / maxDaily) * 100);
-      trendHtml += `
-      <div class="flex items-center gap-3">
-        <span class="card-meta text-xs font-medium w-16">${formatDateShort(day)}</span>
-        <div class="flex-1 chart-track rounded-full h-6 overflow-hidden">
-          <div class="chart-bar bg-emerald-500 h-full" style="width:${pct}%"></div>
-        </div>
-        <span class="card-meta text-xs font-bold w-6 text-right">${c}</span>
-      </div>`;
-    });
-  }
-  document.getElementById("report-trend").innerHTML = trendHtml;
-
-  // --- By Category ---
-  const catCounts = {};
-  CATEGORIES.forEach(c => catCounts[c] = 0);
-  monthTasks.forEach(t => { if (catCounts[t.category] !== undefined) catCounts[t.category]++; });
-  const maxCat = Math.max(1, ...Object.values(catCounts));
-
-  let catHtml = "";
-  for (const [cat, count] of Object.entries(catCounts)) {
-    if (count === 0) continue;
-    const pct = Math.round((count / maxCat) * 100);
-    const color = CATEGORY_COLORS[cat] || "bg-gray-400";
-    catHtml += `
-    <div class="flex items-center gap-3">
-      <span class="card-meta text-xs font-medium w-24">${cat}</span>
-      <div class="flex-1 chart-track rounded-full h-6 overflow-hidden">
-        <div class="chart-bar ${color} h-full" style="width:${pct}%"></div>
-      </div>
-      <span class="card-meta text-xs font-bold w-6 text-right">${count}</span>
-    </div>`;
-  }
-  document.getElementById("report-category").innerHTML = catHtml || emptyState("📭 No category data yet");
+	const { start, end } = getMonthRange(currentDate),
+		all = await getAllTasks(),
+		mt = all.filter(
+			(t) => t.dateAssigned >= start && t.dateAssigned <= end,
+		);
+	const total = mt.length,
+		counts = { Completed: 0, "In Progress": 0, Pending: 0, "On Hold": 0 };
+	mt.forEach((t) => {
+		if (counts[t.status] !== undefined) counts[t.status]++;
+	});
+	const sc = {
+		Completed: "bg-emerald-500",
+		"In Progress": "bg-blue-500",
+		Pending: "bg-purple-500",
+		"On Hold": "bg-slate-400",
+	};
+	let sh = `<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6"><div class="report-stat-card text-center p-4 rounded-xl"><p class="text-3xl font-extrabold">${total}</p><p class="card-meta text-xs font-semibold mt-1">Total</p></div><div class="report-stat-card text-center p-4 rounded-xl"><p class="text-3xl font-extrabold" style="color:#10b981">${counts.Completed}</p><p class="card-meta text-xs font-semibold mt-1">Completed</p></div><div class="report-stat-card text-center p-4 rounded-xl"><p class="text-3xl font-extrabold" style="color:#3b82f6">${counts["In Progress"]}</p><p class="card-meta text-xs font-semibold mt-1">In Progress</p></div><div class="report-stat-card text-center p-4 rounded-xl"><p class="text-3xl font-extrabold" style="color:#8b5cf6">${counts.Pending + counts["On Hold"]}</p><p class="card-meta text-xs font-semibold mt-1">Pending/Hold</p></div></div><div class="space-y-3">`;
+	for (const [s, c] of Object.entries(counts)) {
+		const p = total ? Math.round((c / total) * 100) : 0;
+		sh += `<div class="flex items-center gap-3"><span class="card-meta text-xs font-semibold w-24">${s}</span><div class="flex-1 chart-track rounded-full h-6 overflow-hidden"><div class="chart-bar ${sc[s]} h-full" style="width:${p}%"></div></div><span class="card-meta text-xs font-bold w-12 text-right">${c}(${p}%)</span></div>`;
+	}
+	sh += "</div>";
+	document.getElementById("report-summary").innerHTML = total
+		? sh
+		: emptyState("📭 No tasks this month");
+	const dc = {};
+	mt.filter((t) => t.status === "Completed").forEach((t) => {
+		dc[t.dateAssigned] = (dc[t.dateAssigned] || 0) + 1;
+	});
+	const md = Math.max(1, ...Object.values(dc)),
+		sd = Object.keys(dc).sort();
+	let th = "";
+	if (!sd.length) th = emptyState("📭 No completed");
+	else
+		sd.forEach((d) => {
+			const c = dc[d],
+				p = Math.round((c / md) * 100);
+			th += `<div class="flex items-center gap-3"><span class="card-meta text-xs font-medium w-16">${formatDateShort(d)}</span><div class="flex-1 chart-track rounded-full h-6 overflow-hidden"><div class="chart-bar bg-emerald-500 h-full" style="width:${p}%"></div></div><span class="card-meta text-xs font-bold w-6 text-right">${c}</span></div>`;
+		});
+	document.getElementById("report-trend").innerHTML = th;
+	const cc = {};
+	CATEGORIES.forEach((c) => (cc[c] = 0));
+	mt.forEach((t) => {
+		if (cc[t.category] !== undefined) cc[t.category]++;
+	});
+	const mc = Math.max(1, ...Object.values(cc));
+	let ch = "";
+	for (const [cat, cnt] of Object.entries(cc)) {
+		if (!cnt) continue;
+		const p = Math.round((cnt / mc) * 100),
+			cl = CATEGORY_COLORS[cat] || "bg-gray-400";
+		ch += `<div class="flex items-center gap-3"><span class="card-meta text-xs font-medium w-24">${cat}</span><div class="flex-1 chart-track rounded-full h-6 overflow-hidden"><div class="chart-bar ${cl} h-full" style="width:${p}%"></div></div><span class="card-meta text-xs font-bold w-6 text-right">${cnt}</span></div>`;
+	}
+	document.getElementById("report-category").innerHTML =
+		ch || emptyState("📭 No category data");
 }
 
-// ─── Render: Calendar Tab ────────────────────────────────────
-
+// ─── Calendar ────────────────────────────────────────────────
 async function renderCalendar() {
-  const year  = calendarMonth.getFullYear();
-  const month = calendarMonth.getMonth(); // 0-based
-  const today = todayStr();
-
-  // Update month label
-  const monthNames = ["January","February","March","April","May","June",
-                      "July","August","September","October","November","December"];
-  document.getElementById("cal-month-label").textContent = `${monthNames[month]} ${year}`;
-
-  // Fetch all tasks and group by dateAssigned
-  const allTasks = await getAllTasks();
-  const tasksByDate = {};
-  allTasks.forEach(t => {
-    if (!tasksByDate[t.dateAssigned]) tasksByDate[t.dateAssigned] = [];
-    tasksByDate[t.dateAssigned].push(t);
-  });
-
-  // Build calendar grid
-  let html = "";
-
-  // Header row: Mon Tue Wed Thu Fri Sat Sun
-  const dayLabels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-  dayLabels.forEach(d => {
-    html += `<div class="calendar-header-cell">${d}</div>`;
-  });
-
-  // First day of month (0=Sun, 1=Mon … 6=Sat)
-  const firstDay = new Date(year, month, 1).getDay();
-  // Convert to Monday-start: Mon=0, Tue=1 … Sun=6
-  const startOffset = (firstDay === 0) ? 6 : firstDay - 1;
-
-  // Total days in month
-  const totalDays = new Date(year, month + 1, 0).getDate();
-
-  // Total cells needed (fill complete weeks)
-  const totalCells = Math.ceil((startOffset + totalDays) / 7) * 7;
-
-  for (let i = 0; i < totalCells; i++) {
-    const dayNum = i - startOffset + 1;
-    let cellDate, isOtherMonth = false;
-
-    if (dayNum < 1) {
-      // Previous month
-      const d = new Date(year, month, dayNum);
-      cellDate = toDateStr(d);
-      isOtherMonth = true;
-    } else if (dayNum > totalDays) {
-      // Next month
-      const d = new Date(year, month, dayNum);
-      cellDate = toDateStr(d);
-      isOtherMonth = true;
-    } else {
-      cellDate = `${year}-${String(month+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
-    }
-
-    const isToday    = cellDate === today;
-    const isSelected = cellDate === selectedCalDay;
-    const displayDay = new Date(cellDate + "T00:00:00").getDate();
-
-    let classes = "calendar-cell";
-    if (isToday)      classes += " today";
-    if (isOtherMonth) classes += " other-month";
-    if (isSelected)   classes += " selected";
-
-    // Task dots for this date
-    const dayTasks = tasksByDate[cellDate] || [];
-    let dotsHtml = "";
-    const MAX_DOTS = 6;
-    const dotsToShow = dayTasks.slice(0, MAX_DOTS);
-    dotsToShow.forEach(t => {
-      dotsHtml += `<span class="calendar-dot ${getStatusDotClass(t.status)}"></span>`;
-    });
-    if (dayTasks.length > MAX_DOTS) {
-      dotsHtml += `<span class="card-meta" style="font-size:.6rem;font-weight:700;">+${dayTasks.length - MAX_DOTS}</span>`;
-    }
-
-    // Mobile count fallback
-    const countHtml = dayTasks.length > 0
-      ? `<span class="calendar-task-count">${dayTasks.length} task${dayTasks.length!==1?"s":""}</span>`
-      : "";
-
-    html += `
-    <div class="${classes}" data-date="${cellDate}">
-      <span class="calendar-day-number">${displayDay}</span>
-      <div class="calendar-dots">${dotsHtml}</div>
-      ${countHtml}
-    </div>`;
-  }
-
-  document.getElementById("calendar-grid").innerHTML = html;
-
-  // Attach click handlers to cells
-  document.querySelectorAll(".calendar-cell").forEach(cell => {
-    cell.addEventListener("click", () => {
-      const dateStr = cell.dataset.date;
-      // Update selected state
-      document.querySelectorAll(".calendar-cell.selected").forEach(c => c.classList.remove("selected"));
-      cell.classList.add("selected");
-      selectedCalDay = dateStr;
-      showDayDetail(dateStr);
-    });
-  });
+	const y = calendarMonth.getFullYear(),
+		mo = calendarMonth.getMonth(),
+		td = todayStr();
+	const mn = [
+		"January",
+		"February",
+		"March",
+		"April",
+		"May",
+		"June",
+		"July",
+		"August",
+		"September",
+		"October",
+		"November",
+		"December",
+	];
+	document.getElementById("cal-month-label").textContent = `${mn[mo]} ${y}`;
+	const all = await getAllTasks(),
+		tbd = {};
+	all.forEach((t) => {
+		if (!tbd[t.dateAssigned]) tbd[t.dateAssigned] = [];
+		tbd[t.dateAssigned].push(t);
+	});
+	let h = "";
+	["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach((d) => {
+		h += `<div class="calendar-header-cell">${d}</div>`;
+	});
+	const fd = new Date(y, mo, 1).getDay(),
+		so = fd === 0 ? 6 : fd - 1,
+		tds = new Date(y, mo + 1, 0).getDate(),
+		tc = Math.ceil((so + tds) / 7) * 7;
+	for (let i = 0; i < tc; i++) {
+		const dn = i - so + 1;
+		let cd,
+			om = false;
+		if (dn < 1) {
+			const d = new Date(y, mo, dn);
+			cd = toDateStr(d);
+			om = true;
+		} else if (dn > tds) {
+			const d = new Date(y, mo, dn);
+			cd = toDateStr(d);
+			om = true;
+		} else {
+			cd = `${y}-${String(mo + 1).padStart(2, "0")}-${String(dn).padStart(2, "0")}`;
+		}
+		const it = cd === td,
+			is = cd === selectedCalDay,
+			dd = new Date(cd + "T00:00:00").getDate();
+		let cl = "calendar-cell";
+		if (it) cl += " today";
+		if (om) cl += " other-month";
+		if (is) cl += " selected";
+		const dt = tbd[cd] || [];
+		let dh = "";
+		const mx = 6;
+		dt.slice(0, mx).forEach((t) => {
+			dh += `<span class="calendar-dot ${getStatusDotClass(t.status)}"></span>`;
+		});
+		if (dt.length > mx)
+			dh += `<span class="card-meta" style="font-size:.6rem;font-weight:700">+${dt.length - mx}</span>`;
+		const ch = dt.length
+			? `<span class="calendar-task-count">${dt.length} task${dt.length !== 1 ? "s" : ""}</span>`
+			: "";
+		h += `<div class="${cl}" data-date="${cd}"><span class="calendar-day-number">${dd}</span><div class="calendar-dots">${dh}</div>${ch}</div>`;
+	}
+	document.getElementById("calendar-grid").innerHTML = h;
+	document.querySelectorAll(".calendar-cell").forEach((c) => {
+		c.addEventListener("click", () => {
+			document
+				.querySelectorAll(".calendar-cell.selected")
+				.forEach((x) => x.classList.remove("selected"));
+			c.classList.add("selected");
+			selectedCalDay = c.dataset.date;
+			showDayDetail(c.dataset.date);
+		});
+	});
 }
-
-async function showDayDetail(dateStr) {
-  const tasks = await getTasksByDate(dateStr);
-  const panel = document.getElementById("day-detail-panel");
-  const titleEl = document.getElementById("day-detail-title");
-  const tasksEl = document.getElementById("day-detail-tasks");
-
-  // Show panel
-  panel.style.display = "block";
-
-  // Title
-  titleEl.textContent = `${formatDate(dateStr)} — ${tasks.length} task${tasks.length!==1?"s":""}`;
-
-  // Render task cards
-  if (tasks.length > 0) {
-    tasksEl.innerHTML = `<div class="compact-grid" style="display:grid; grid-template-columns: repeat(3,1fr); gap:1rem;">
-      ${tasks.map(renderCompactCard).join("")}
-    </div>`;
-  } else {
-    tasksEl.innerHTML = emptyState("📭 No tasks on this day");
-  }
-
-  // Scroll into view
-  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+async function showDayDetail(ds) {
+	const t = await getTasksByDate(ds),
+		p = document.getElementById("day-detail-panel");
+	p.style.display = "block";
+	document.getElementById("day-detail-title").textContent =
+		`${formatDate(ds)} — ${t.length} task${t.length !== 1 ? "s" : ""}`;
+	document.getElementById("day-detail-tasks").innerHTML = t.length
+		? `<div class="compact-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">${t.map(renderCompactCard).join("")}</div>`
+		: emptyState("📭 No tasks on this day");
+	p.scrollIntoView({ behavior: "smooth", block: "start" });
 }
-
 function closeDayDetail() {
-  document.getElementById("day-detail-panel").style.display = "none";
-  selectedCalDay = null;
-  document.querySelectorAll(".calendar-cell.selected").forEach(c => c.classList.remove("selected"));
+	document.getElementById("day-detail-panel").style.display = "none";
+	selectedCalDay = null;
+	document
+		.querySelectorAll(".calendar-cell.selected")
+		.forEach((c) => c.classList.remove("selected"));
 }
 
-// ─── Carry-Forward ───────────────────────────────────────────
+// ─── Carry Forward ───────────────────────────────────────────
 async function carryForward() {
-  try {
-    const prevDay   = getPreviousDay(currentDate);
-    const prevTasks = await getTasksByDate(prevDay);
-    const toCopy    = prevTasks.filter(t =>
-      ["In Progress","Pending","On Hold"].includes(t.status) && t.carryForward
-    );
-
-    if (toCopy.length === 0) {
-      showToast("No tasks to carry forward", "info");
-      return;
-    }
-
-    // Check if already carried today (avoid duplicates)
-    const todayTasks = await getTasksByDate(currentDate);
-    const alreadyCarried = todayTasks.filter(t => t.carriedFrom === prevDay).map(t => t.title);
-
-    let counter = (await getSetting("taskCounter")) || 0;
-    let carried = 0;
-
-    for (const t of toCopy) {
-      if (alreadyCarried.includes(t.title)) continue; // skip duplicates
-      counter++;
-      const newTask = {
-        taskId:         generateTaskId(counter),
-        title:          t.title,
-        category:       t.category,
-        priority:       t.priority,
-        status:         t.status,
-        assignedTo:     t.assignedTo,
-        dueDate:        t.dueDate,
-        estimatedHours: t.estimatedHours,
-        actualHours:    0,
-        notes:          t.notes,
-        carriedFrom:    prevDay,
-        carryForward:   true,
-        dateAssigned:   currentDate,
-        createdAt:      nowISO(),
-        updatedAt:      nowISO()
-      };
-      await addTask(newTask);
-      carried++;
-    }
-
-    await setSetting("taskCounter", counter);
-    await setSetting("lastCarryForwardDate", currentDate);
-
-    if (carried > 0) {
-      showToast(`⚡ Carried forward ${carried} task${carried!==1?"s":""}`, "success");
-    } else {
-      showToast("Tasks already carried forward today", "info");
-    }
-    await renderProductivity();
-  } catch (err) {
-    console.error(err);
-    showToast("Carry forward failed", "error");
-  }
+	try {
+		const pd = getPreviousDay(currentDate),
+			pt = await getTasksByDate(pd),
+			tc = pt.filter(
+				(t) =>
+					["In Progress", "Pending", "On Hold"].includes(t.status) &&
+					t.carryForward,
+			);
+		if (!tc.length) {
+			showToast("No tasks to carry forward", "info");
+			return;
+		}
+		const tt = await getTasksByDate(currentDate),
+			ac = tt.filter((t) => t.carriedFrom === pd).map((t) => t.title);
+		let ctr = (await getSetting("taskCounter")) || 0,
+			carried = 0;
+		for (const t of tc) {
+			if (ac.includes(t.title)) continue;
+			ctr++;
+			await addTask({
+				taskId: generateTaskId(ctr),
+				title: t.title,
+				category: t.category,
+				priority: t.priority,
+				status: t.status,
+				assignedTo: t.assignedTo,
+				dueDate: t.dueDate,
+				estimatedHours: t.estimatedHours,
+				actualHours: 0,
+				notes: t.notes,
+				carriedFrom: pd,
+				carryForward: true,
+				dateAssigned: currentDate,
+				createdAt: nowISO(),
+				updatedAt: nowISO(),
+			});
+			carried++;
+		}
+		await setSetting("taskCounter", ctr);
+		await setSetting("lastCarryForwardDate", currentDate);
+		if (carried > 0)
+			showToast(
+				`⚡ Carried forward ${carried} task${carried !== 1 ? "s" : ""}`,
+				"success",
+			);
+		else showToast("Already carried forward", "info");
+		await renderProductivity();
+	} catch (e) {
+		console.error(e);
+		showToast("Carry forward failed", "error");
+	}
 }
-
 async function autoCarryForward() {
-  const last = await getSetting("lastCarryForwardDate");
-  if (!last || last < todayStr()) {
-    await carryForward();
-  }
+	const l = await getSetting("lastCarryForwardDate");
+	if (!l || l < todayStr()) await carryForward();
 }
 
-// ─── Theme Toggle ────────────────────────────────────────────
+// ─── Theme ───────────────────────────────────────────────────
 function initTheme() {
-  const saved = localStorage.getItem("taskboard-theme");
-  const btn   = document.getElementById("btn-theme-toggle");
-  if (saved === "light") {
-    document.body.classList.remove("dark");
-    btn.textContent = "☀️";
-  } else {
-    document.body.classList.add("dark");
-    btn.textContent = "🌙";
-  }
+	const s = localStorage.getItem("taskboard-theme"),
+		b = document.getElementById("btn-theme-toggle");
+	if (s === "light") {
+		document.body.classList.remove("dark");
+		b.textContent = "☀️";
+	} else {
+		document.body.classList.add("dark");
+		b.textContent = "🌙";
+	}
 }
-
 function toggleTheme() {
-  const btn = document.getElementById("btn-theme-toggle");
-  document.body.classList.toggle("dark");
-  const isDark = document.body.classList.contains("dark");
-  btn.textContent = isDark ? "🌙" : "☀️";
-  localStorage.setItem("taskboard-theme", isDark ? "dark" : "light");
+	const b = document.getElementById("btn-theme-toggle");
+	document.body.classList.toggle("dark");
+	const d = document.body.classList.contains("dark");
+	b.textContent = d ? "🌙" : "☀️";
+	localStorage.setItem("taskboard-theme", d ? "dark" : "light");
 }
 
-// ─── Modal Management ────────────────────────────────────────
-function openTaskModal(taskId = null) {
-  const modal     = document.getElementById("task-modal");
-  const titleEl   = document.getElementById("modal-title");
-  const form      = document.getElementById("task-form");
-
-  form.reset();
-  document.getElementById("form-taskId").value = "";
-  document.getElementById("form-assignedTo").value = "Ashish Moghe";
-  document.getElementById("form-dueDate").value = currentDate;
-  document.getElementById("form-carryForward").checked = true;
-  document.getElementById("form-priority").value = "Medium";
-  document.getElementById("form-status").value = "In Progress";
-  document.getElementById("form-category").value = "Development";
-
-  if (taskId) {
-    titleEl.textContent = "Edit Task";
-    getTask(taskId).then(task => {
-      if (!task) return;
-      document.getElementById("form-taskId").value          = task.taskId;
-      document.getElementById("form-title").value           = task.title;
-      document.getElementById("form-category").value        = task.category;
-      document.getElementById("form-priority").value        = task.priority;
-      document.getElementById("form-status").value          = task.status;
-      document.getElementById("form-assignedTo").value      = task.assignedTo || "Ashish Moghe";
-      document.getElementById("form-dueDate").value         = task.dueDate || "";
-      document.getElementById("form-estimatedHours").value  = task.estimatedHours || "";
-      document.getElementById("form-actualHours").value     = task.actualHours || "";
-      document.getElementById("form-notes").value           = task.notes || "";
-      document.getElementById("form-carryForward").checked  = !!task.carryForward;
-    });
-  } else {
-    titleEl.textContent = "Add Task";
-  }
-
-  modal.classList.add("open");
+// ─── Task Modal ──────────────────────────────────────────────
+function openTaskModal(id = null) {
+	const m = document.getElementById("task-modal"),
+		t = document.getElementById("modal-title");
+	document.getElementById("task-form").reset();
+	document.getElementById("form-taskId").value = "";
+	document.getElementById("form-assignedTo").value = "Ashish Moghe";
+	document.getElementById("form-dueDate").value = currentDate;
+	document.getElementById("form-carryForward").checked = true;
+	document.getElementById("form-priority").value = "Medium";
+	document.getElementById("form-status").value = "In Progress";
+	document.getElementById("form-category").value = "Development";
+	if (id) {
+		t.textContent = "Edit Task";
+		getTask(id).then((task) => {
+			if (!task) return;
+			document.getElementById("form-taskId").value = task.taskId;
+			document.getElementById("form-title").value = task.title;
+			document.getElementById("form-category").value = task.category;
+			document.getElementById("form-priority").value = task.priority;
+			document.getElementById("form-status").value = task.status;
+			document.getElementById("form-assignedTo").value =
+				task.assignedTo || "Ashish Moghe";
+			document.getElementById("form-dueDate").value = task.dueDate || "";
+			document.getElementById("form-estimatedHours").value =
+				task.estimatedHours || "";
+			document.getElementById("form-actualHours").value =
+				task.actualHours || "";
+			document.getElementById("form-notes").value = task.notes || "";
+			document.getElementById("form-carryForward").checked =
+				!!task.carryForward;
+		});
+	} else t.textContent = "Add Task";
+	m.classList.add("open");
 }
-
 function closeTaskModal() {
-  document.getElementById("task-modal").classList.remove("open");
+	document.getElementById("task-modal").classList.remove("open");
 }
-
 async function saveTask() {
-  const title = document.getElementById("form-title").value.trim();
-  if (!title) { showToast("Task title is required", "error"); return; }
-
-  const existingId = document.getElementById("form-taskId").value;
-
-  const taskData = {
-    title,
-    category:       document.getElementById("form-category").value,
-    priority:       document.getElementById("form-priority").value,
-    status:         document.getElementById("form-status").value,
-    assignedTo:     document.getElementById("form-assignedTo").value.trim() || "Ashish Moghe",
-    dueDate:        document.getElementById("form-dueDate").value,
-    estimatedHours: parseFloat(document.getElementById("form-estimatedHours").value) || 0,
-    actualHours:    parseFloat(document.getElementById("form-actualHours").value) || 0,
-    notes:          document.getElementById("form-notes").value.trim(),
-    carryForward:   document.getElementById("form-carryForward").checked,
-    updatedAt:      nowISO()
-  };
-
-  try {
-    if (existingId) {
-      // Edit
-      const existing = await getTask(existingId);
-      Object.assign(existing, taskData);
-      await updateTask(existing);
-      showToast("✏️ Task updated", "success");
-    } else {
-      // New
-      let counter = (await getSetting("taskCounter")) || 0;
-      counter++;
-      taskData.taskId       = generateTaskId(counter);
-      taskData.dateAssigned  = currentDate;
-      taskData.carriedFrom   = "";
-      taskData.createdAt     = nowISO();
-      await addTask(taskData);
-      await setSetting("taskCounter", counter);
-      showToast("✅ Task created", "success");
-    }
-    closeTaskModal();
-    await refreshActiveView();
-  } catch (err) {
-    console.error(err);
-    showToast("Failed to save task", "error");
-  }
+	const title = document.getElementById("form-title").value.trim();
+	if (!title) {
+		showToast("Title required", "error");
+		return;
+	}
+	const eid = document.getElementById("form-taskId").value,
+		data = {
+			title,
+			category: document.getElementById("form-category").value,
+			priority: document.getElementById("form-priority").value,
+			status: document.getElementById("form-status").value,
+			assignedTo:
+				document.getElementById("form-assignedTo").value.trim() ||
+				"Ashish Moghe",
+			dueDate: document.getElementById("form-dueDate").value,
+			estimatedHours:
+				parseFloat(
+					document.getElementById("form-estimatedHours").value,
+				) || 0,
+			actualHours:
+				parseFloat(document.getElementById("form-actualHours").value) ||
+				0,
+			notes: document.getElementById("form-notes").value.trim(),
+			carryForward: document.getElementById("form-carryForward").checked,
+			updatedAt: nowISO(),
+		};
+	try {
+		if (eid) {
+			const ex = await getTask(eid);
+			Object.assign(ex, data);
+			await updateTask(ex);
+			showToast("✏️ Task updated", "success");
+		} else {
+			let c = (await getSetting("taskCounter")) || 0;
+			c++;
+			data.taskId = generateTaskId(c);
+			data.dateAssigned = currentDate;
+			data.carriedFrom = "";
+			data.createdAt = nowISO();
+			await addTask(data);
+			await setSetting("taskCounter", c);
+			showToast("✅ Task created", "success");
+		}
+		closeTaskModal();
+		await refreshActiveView();
+	} catch (e) {
+		console.error(e);
+		showToast("Save failed", "error");
+	}
 }
-
-// ─── Delete Flow ─────────────────────────────────────────────
-function openDeleteModal(taskId) {
-  document.getElementById("delete-taskId").value = taskId;
-  document.getElementById("delete-modal").classList.add("open");
+function openDeleteModal(id) {
+	document.getElementById("delete-taskId").value = id;
+	document.getElementById("delete-modal").classList.add("open");
 }
 function closeDeleteModal() {
-  document.getElementById("delete-modal").classList.remove("open");
+	document.getElementById("delete-modal").classList.remove("open");
 }
 async function confirmDelete() {
-  const taskId = document.getElementById("delete-taskId").value;
-  try {
-    await deleteTask(taskId);
-    closeDeleteModal();
-    showToast("🗑️ Task deleted", "success");
-    await refreshActiveView();
-  } catch (err) {
-    console.error(err);
-    showToast("Failed to delete task", "error");
-  }
+	const id = document.getElementById("delete-taskId").value;
+	try {
+		await deleteTask(id);
+		closeDeleteModal();
+		showToast("🗑️ Task deleted", "success");
+		await refreshActiveView();
+	} catch (e) {
+		console.error(e);
+		showToast("Delete failed", "error");
+	}
 }
-
-// ─── Refresh Active View (helper) ────────────────────────────
 async function refreshActiveView() {
-  if (activeTab === "productivity") {
-    await renderProductivity();
-  } else if (activeTab === "reports") {
-    await renderReports();
-  } else if (activeTab === "calendar") {
-    await renderCalendar();
-    if (selectedCalDay) await showDayDetail(selectedCalDay);
-  }
+	if (activeTab === "productivity") await renderProductivity();
+	else if (activeTab === "reports") await renderReports();
+	else if (activeTab === "calendar") {
+		await renderCalendar();
+		if (selectedCalDay) await showDayDetail(selectedCalDay);
+	}
 }
 
-// ─── Import / Export ─────────────────────────────────────────
+// ─── Task Import/Export ──────────────────────────────────────
 async function exportData() {
-  try {
-    const tasks = await getAllTasks();
-    const payload = {
-      version:    "1.0",
-      exportDate: nowISO(),
-      tasks
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = `taskboard-export-${todayStr()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("📦 Data exported", "success");
-  } catch (err) {
-    console.error(err);
-    showToast("Export failed", "error");
-  }
+	try {
+		const t = await getAllTasks();
+		const b = new Blob(
+			[
+				JSON.stringify(
+					{ version: "1.0", exportDate: nowISO(), tasks: t },
+					null,
+					2,
+				),
+			],
+			{ type: "application/json" },
+		);
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(b);
+		a.download = `taskboard-export-${todayStr()}.json`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+		showToast("📦 Data exported", "success");
+	} catch (e) {
+		showToast("Export failed", "error");
+	}
 }
-
 function handleImportFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    try {
-      const data = JSON.parse(ev.target.result);
-      if (!data.tasks || !Array.isArray(data.tasks)) {
-        showToast("Invalid file: missing tasks array", "error");
-        return;
-      }
-      importedData = data;
-      document.getElementById("import-modal").classList.add("open");
-    } catch {
-      showToast("Invalid JSON file", "error");
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = ""; // reset so same file can be re-imported
+	const f = e.target.files[0];
+	if (!f) return;
+	const r = new FileReader();
+	r.onload = (ev) => {
+		try {
+			const d = JSON.parse(ev.target.result);
+			if (!d.tasks || !Array.isArray(d.tasks)) {
+				showToast("Invalid file", "error");
+				return;
+			}
+			importedData = d;
+			document.getElementById("import-modal").classList.add("open");
+		} catch {
+			showToast("Invalid JSON", "error");
+		}
+	};
+	r.readAsText(f);
+	e.target.value = "";
 }
-
 async function importReplace() {
-  if (!importedData) return;
-  try {
-    await clearAllTasks();
-    for (const t of importedData.tasks) await addTask(t);
-    // update counter
-    const maxId = importedData.tasks.reduce((m, t) => {
-      const n = parseInt(t.taskId.replace("T-",""), 10);
-      return n > m ? n : m;
-    }, 0);
-    await setSetting("taskCounter", maxId);
-    closeImportModal();
-    showToast(`🔄 Replaced with ${importedData.tasks.length} tasks`, "success");
-    importedData = null;
-    await refreshActiveView();
-  } catch (err) {
-    console.error(err);
-    showToast("Import failed", "error");
-  }
+	if (!importedData) return;
+	try {
+		await clearAllTasks();
+		for (const t of importedData.tasks) await addTask(t);
+		const mx = importedData.tasks.reduce((m, t) => {
+			const n = parseInt(t.taskId.replace("T-", ""), 10);
+			return n > m ? n : m;
+		}, 0);
+		await setSetting("taskCounter", mx);
+		closeImportModal();
+		showToast(`🔄 Replaced ${importedData.tasks.length} tasks`, "success");
+		importedData = null;
+		await refreshActiveView();
+	} catch (e) {
+		showToast("Import failed", "error");
+	}
 }
-
 async function importMerge() {
-  if (!importedData) return;
-  try {
-    let added = 0, skipped = 0;
-    for (const t of importedData.tasks) {
-      const exists = await getTask(t.taskId);
-      if (exists) { skipped++; } else { await addTask(t); added++; }
-    }
-    // update counter
-    const allTasks = await getAllTasks();
-    const maxId = allTasks.reduce((m, t) => {
-      const n = parseInt(t.taskId.replace("T-",""), 10);
-      return n > m ? n : m;
-    }, 0);
-    await setSetting("taskCounter", maxId);
-    closeImportModal();
-    showToast(`🔀 Merged: ${added} added, ${skipped} skipped`, "success");
-    importedData = null;
-    await refreshActiveView();
-  } catch (err) {
-    console.error(err);
-    showToast("Import failed", "error");
-  }
+	if (!importedData) return;
+	try {
+		let a = 0,
+			s = 0;
+		for (const t of importedData.tasks) {
+			if (await getTask(t.taskId)) s++;
+			else {
+				await addTask(t);
+				a++;
+			}
+		}
+		const all = await getAllTasks(),
+			mx = all.reduce((m, t) => {
+				const n = parseInt(t.taskId.replace("T-", ""), 10);
+				return n > m ? n : m;
+			}, 0);
+		await setSetting("taskCounter", mx);
+		closeImportModal();
+		showToast(`🔀 ${a} added, ${s} skipped`, "success");
+		importedData = null;
+		await refreshActiveView();
+	} catch (e) {
+		showToast("Import failed", "error");
+	}
 }
-
 function closeImportModal() {
-  document.getElementById("import-modal").classList.remove("open");
+	document.getElementById("import-modal").classList.remove("open");
 }
-
-// ─── Quick Status Change ─────────────────────────────────────
-async function quickStatusChange(taskId, newStatus) {
-  try {
-    const task = await getTask(taskId);
-    if (!task) return;
-    task.status    = newStatus;
-    task.updatedAt = nowISO();
-    await updateTask(task);
-    showToast(`Status → ${newStatus}`, "info");
-    await refreshActiveView();
-  } catch (err) {
-    console.error(err);
-    showToast("Status update failed", "error");
-  }
+async function quickStatusChange(id, st) {
+	try {
+		const t = await getTask(id);
+		if (!t) return;
+		t.status = st;
+		t.updatedAt = nowISO();
+		await updateTask(t);
+		showToast(`Status → ${st}`, "info");
+		await refreshActiveView();
+	} catch (e) {
+		showToast("Status update failed", "error");
+	}
 }
-
 // ─── Tab Switching ───────────────────────────────────────────
 function switchTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll(".tab-btn").forEach(b => {
-    b.classList.toggle("active", b.dataset.tab === tab);
-  });
-  document.getElementById("tab-productivity").classList.toggle("hidden", tab !== "productivity");
-  document.getElementById("tab-reports").classList.toggle("hidden", tab !== "reports");
-  document.getElementById("tab-calendar").classList.toggle("hidden", tab !== "calendar");
-
-  if (tab === "reports")  renderReports();
-  if (tab === "calendar") renderCalendar();
+	activeTab = tab;
+	document
+		.querySelectorAll(".tab-btn")
+		.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+	["productivity", "reports", "calendar", "reminders"].forEach((t) => {
+		const el = document.getElementById("tab-" + t);
+		if (el) el.classList.toggle("hidden", t !== tab);
+	});
+	if (tab === "reports") renderReports();
+	if (tab === "calendar") renderCalendar();
+	if (tab === "reminders") Rem.render();
 }
 
 // ─── Event Delegation ────────────────────────────────────────
-function attachCardEvents(container) {
-  container.addEventListener("change", (e) => {
-    if (e.target.classList.contains("status-select")) {
-      quickStatusChange(e.target.dataset.taskid, e.target.value);
-    }
-  });
-  container.addEventListener("click", (e) => {
-    const editBtn = e.target.closest(".btn-edit");
-    if (editBtn) { openTaskModal(editBtn.dataset.taskid); return; }
-
-    const delBtn = e.target.closest(".btn-delete");
-    if (delBtn) { openDeleteModal(delBtn.dataset.taskid); return; }
-
-    const compactCard = e.target.closest(".compact-card");
-    if (compactCard) { openTaskModal(compactCard.dataset.taskid); }
-  });
+function attachCardEvents(c) {
+	c.addEventListener("change", (e) => {
+		if (e.target.classList.contains("status-select"))
+			quickStatusChange(e.target.dataset.taskid, e.target.value);
+	});
+	c.addEventListener("click", (e) => {
+		const eb = e.target.closest(".btn-edit");
+		if (eb) {
+			openTaskModal(eb.dataset.taskid);
+			return;
+		}
+		const db = e.target.closest(".btn-delete");
+		if (db) {
+			openDeleteModal(db.dataset.taskid);
+			return;
+		}
+		const cc = e.target.closest(".compact-card");
+		if (cc) openTaskModal(cc.dataset.taskid);
+	});
 }
+
+// ============================================================
+//  REMINDERS MODULE — Fully Isolated
+// ============================================================
+const Rem = {
+	db: null,
+	importedData: null,
+	engineInterval: null,
+
+	// ─── DB ────────────────────────────────────────────────────
+	initDB() {
+		return new Promise((res, rej) => {
+			const r = indexedDB.open("TaskBoardRemindersDB", 1);
+			r.onupgradeneeded = (e) => {
+				const d = e.target.result;
+				if (!d.objectStoreNames.contains("reminders")) {
+					const s = d.createObjectStore("reminders", {
+						keyPath: "reminderId",
+					});
+					s.createIndex("status", "status", { unique: false });
+					s.createIndex("reminderTime", "reminderTime", {
+						unique: false,
+					});
+				}
+				if (!d.objectStoreNames.contains("settings"))
+					d.createObjectStore("settings", { keyPath: "key" });
+			};
+			r.onsuccess = (e) => {
+				Rem.db = e.target.result;
+				res(Rem.db);
+			};
+			r.onerror = (e) => rej(e.target.error);
+		});
+	},
+	_tx(s, m = "readonly") {
+		return Rem.db.transaction(s, m).objectStore(s);
+	},
+	addReminder(r) {
+		return new Promise((a, j) => {
+			const q = Rem._tx("reminders", "readwrite").put(r);
+			q.onsuccess = () => a(q.result);
+			q.onerror = () => j(q.error);
+		});
+	},
+	getReminder(id) {
+		return new Promise((a, j) => {
+			const q = Rem._tx("reminders").get(id);
+			q.onsuccess = () => a(q.result);
+			q.onerror = () => j(q.error);
+		});
+	},
+	getAllReminders() {
+		return new Promise((a, j) => {
+			const q = Rem._tx("reminders").getAll();
+			q.onsuccess = () => a(q.result || []);
+			q.onerror = () => j(q.error);
+		});
+	},
+	deleteRem(id) {
+		return new Promise((a, j) => {
+			const q = Rem._tx("reminders", "readwrite").delete(id);
+			q.onsuccess = () => a();
+			q.onerror = () => j(q.error);
+		});
+	},
+	clearAll() {
+		return new Promise((a, j) => {
+			const q = Rem._tx("reminders", "readwrite").clear();
+			q.onsuccess = () => a();
+			q.onerror = () => j(q.error);
+		});
+	},
+	getSetting(k) {
+		return new Promise((a, j) => {
+			const q = Rem._tx("settings").get(k);
+			q.onsuccess = () => a(q.result ? q.result.value : null);
+			q.onerror = () => j(q.error);
+		});
+	},
+	setSetting(k, v) {
+		return new Promise((a, j) => {
+			const q = Rem._tx("settings", "readwrite").put({
+				key: k,
+				value: v,
+			});
+			q.onsuccess = () => a();
+			q.onerror = () => j(q.error);
+		});
+	},
+
+	// ─── Helpers ───────────────────────────────────────────────
+	genId(n) {
+		return "R-" + String(n).padStart(3, "0");
+	},
+	fmtTime(iso) {
+		if (!iso) return "—";
+		const d = new Date(iso);
+		return (
+			d.toLocaleDateString("en-US", { month: "short", day: "2-digit" }) +
+			", " +
+			d.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				hour12: true,
+			})
+		);
+	},
+	escHtml(s) {
+		if (!s) return "";
+		return s
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;");
+	},
+	nowISO() {
+		return new Date().toISOString();
+	},
+
+	// ─── Rendering ─────────────────────────────────────────────
+	async render() {
+		const all = await this.getAllReminders(),
+			now = new Date();
+		const active = all.filter(
+			(r) => r.status === "active" || r.status === "snoozed",
+		);
+		const overdue = all.filter((r) => r.status === "overdue");
+		const completed = all.filter((r) => r.status === "completed");
+		document.getElementById("rem-stats").innerHTML =
+			`<div class="rem-stat-pill">🔔 Active: ${active.length}</div><div class="rem-stat-pill">⚠️ Overdue: ${overdue.length}</div><div class="rem-stat-pill">✅ Done: ${completed.length}</div><div class="rem-stat-pill">📊 Total: ${all.length}</div>`;
+		const g = document.getElementById("rem-active-grid");
+		g.innerHTML = active.length
+			? active.map((r) => this.renderCard(r, now)).join("")
+			: '<div class="empty-state">🔔 No active reminders. Create one!</div>';
+		document.getElementById("rem-overdue-tbody").innerHTML = overdue.length
+			? overdue.map((r) => this.renderOverdueRow(r)).join("")
+			: '<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:#64748b">No overdue reminders</td></tr>';
+		document.getElementById("rem-overdue-count").textContent =
+			overdue.length;
+		document.getElementById("rem-completed-tbody").innerHTML =
+			completed.length
+				? completed.map((r) => this.renderCompletedRow(r)).join("")
+				: '<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:#64748b">No completed reminders</td></tr>';
+		document.getElementById("rem-completed-count").textContent =
+			completed.length;
+	},
+
+	renderCard(r, now) {
+		const rt = new Date(r.reminderTime),
+			lead = (r.fireCount || 1) * (r.fireInterval || 30) * 1000,
+			startAt = new Date(rt.getTime() - lead),
+			diffStart = startAt - now;
+		let urg = "rc-scheduled";
+		if (r.status === "snoozed") urg = "rc-snoozed";
+		else if (now >= startAt && (r.firedCount || 0) > 0) urg = "rc-firing";
+		else if (diffStart <= 30 * 60 * 1000 && diffStart > 0) urg = "rc-soon";
+		else if (now >= startAt) urg = "rc-firing";
+
+		const desc = r.description
+			? `<p class="rc-desc line-clamp-2">${this.escHtml(r.description)}</p>`
+			: "";
+		const rud = r.remindUntilDone
+			? '<span class="rud-badge">🔁 Until Done</span>'
+			: "";
+		const fb = `<span class="fire-badge">🔔 ${r.firedCount || 0}/${r.remindUntilDone ? "∞" : r.fireCount}</span>`;
+		const sb = r.soundName
+			? `<span class="sound-badge">🔊 ${this.escHtml(r.soundName)}</span>`
+			: "";
+		const si =
+			r.status === "snoozed" && r.snoozedUntil
+				? `<span>💤 Until ${this.fmtTime(r.snoozedUntil)}</span>`
+				: "";
+		return `<div class="reminder-card ${urg}" data-remid="${r.reminderId}"><div class="rc-title">${this.escHtml(r.title)}</div>${desc}<div class="rc-meta"><span>⏰ ${this.fmtTime(r.reminderTime)}</span>${si}</div><div class="rc-meta">${fb} ${rud} ${sb}</div><div class="rc-actions"><button class="rem-action-btn" onclick="Rem.completeReminder('${r.reminderId}')" title="Complete">✅</button><select class="snooze-select" onchange="Rem.snoozeReminder('${r.reminderId}',this.value);this.selectedIndex=0"><option value="">💤 Snooze</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option></select><button class="rem-action-btn" onclick="Rem.openModal('${r.reminderId}')" title="Edit">✏️</button><button class="rem-action-btn danger" onclick="Rem.openDeleteModal('${r.reminderId}')" title="Delete">🗑️</button></div></div>`;
+	},
+
+	renderOverdueRow(r) {
+		return `<tr><td class="td-title">${this.escHtml(r.title)}</td><td class="td-time">${this.fmtTime(r.reminderTime)}</td><td><span class="fire-badge">🔔 ${r.firedCount || 0}/${r.fireCount}</span></td><td><button class="rem-action-btn" onclick="Rem.completeReminder('${r.reminderId}')" title="Complete">✅</button><select class="snooze-select" onchange="Rem.snoozeReminder('${r.reminderId}',this.value);this.selectedIndex=0"><option value="">💤</option><option value="5">5m</option><option value="10">10m</option><option value="30">30m</option><option value="60">1h</option></select><button class="rem-action-btn danger" onclick="Rem.openDeleteModal('${r.reminderId}')" title="Delete">🗑️</button></td></tr>`;
+	},
+	renderCompletedRow(r) {
+		return `<tr><td class="td-title">${this.escHtml(r.title)}</td><td class="td-time">${this.fmtTime(r.reminderTime)}</td><td class="td-time">${r.completedAt ? this.fmtTime(r.completedAt) : "—"}</td><td><button class="rem-action-btn danger" onclick="Rem.openDeleteModal('${r.reminderId}')" title="Delete">🗑️</button></td></tr>`;
+	},
+
+	// ─── Notification Engine ───────────────────────────────────
+	startEngine() {
+		this.engineInterval = setInterval(() => this.tick(), 1000);
+		this.tick();
+	},
+	async tick() {
+		const all = await this.getAllReminders(),
+			now = new Date();
+		let changed = false;
+		for (const r of all) {
+			if (
+				r.status === "snoozed" &&
+				r.snoozedUntil &&
+				new Date(r.snoozedUntil) <= now
+			) {
+				r.status = "active";
+				r.snoozedUntil = null;
+				r.updatedAt = this.nowISO();
+				await this.addReminder(r);
+				changed = true;
+				continue;
+			}
+			if (r.status === "active") {
+				const rt = new Date(r.reminderTime);
+				const lead = (r.fireCount || 1) * (r.fireInterval || 30) * 1000;
+				const startAt = new Date(rt.getTime() - lead);
+				if (now >= startAt) {
+					const shouldFire =
+						r.remindUntilDone || (r.firedCount || 0) < r.fireCount;
+					if (shouldFire) {
+						const lf = r.lastFiredAt
+							? new Date(r.lastFiredAt)
+							: new Date(0);
+						const el = (now - lf) / 1000;
+						if (el >= (r.fireInterval || 30)) {
+							this.fireNotification(r);
+							this.playSound(
+								"/Resources/reminder.mp3" ||
+									r.soundUrl,
+							);
+							r.firedCount = (r.firedCount || 0) + 1;
+							r.lastFiredAt = this.nowISO();
+							r.updatedAt = this.nowISO();
+							await this.addReminder(r);
+							changed = true;
+						}
+					} else if (
+						!r.remindUntilDone &&
+						(r.firedCount || 0) >= r.fireCount &&
+						now >= rt
+					) {
+						r.status = "overdue";
+						r.updatedAt = this.nowISO();
+						await this.addReminder(r);
+						changed = true;
+					}
+				}
+			}
+		}
+		if (changed && activeTab === "reminders") this.render();
+	},
+
+	fireNotification(r) {
+		if (
+			typeof Notification !== "undefined" &&
+			Notification.permission === "granted"
+		) {
+			const rt = new Date(r.reminderTime),
+				diff = Math.round((rt - new Date()) / 60000);
+			const timeInfo = diff <= 0 ? "⏰ Now!" : "⏰ In " + diff + " min";
+			const body = (r.description ? r.description + "\n" : "") + timeInfo;
+			new Notification("🔔 " + r.title, {
+				body,
+				tag: r.reminderId + "-" + (r.firedCount || 0),
+				requireInteraction: true,
+			});
+		}
+	},
+
+	// ─── Sound ─────────────────────────────────────────────────
+	playSound(url) {
+		try {
+			if (url) {
+				const a = new Audio(url);
+				a.volume = 0.7;
+				a.play().catch(() => {});
+			} else this.playDefaultBeep();
+		} catch (e) {
+			console.warn("Sound error:", e);
+		}
+	},
+	playDefaultBeep() {
+		try {
+			const c = new (window.AudioContext || window.webkitAudioContext)(),
+				o = c.createOscillator(),
+				g = c.createGain();
+			o.connect(g);
+			g.connect(c.destination);
+			o.frequency.value = 440;
+			o.type = "sine";
+			g.gain.value = 0.3;
+			o.start();
+			o.stop(c.currentTime + 0.2);
+			setTimeout(() => {
+				try {
+					const o2 = c.createOscillator(),
+						g2 = c.createGain();
+					o2.connect(g2);
+					g2.connect(c.destination);
+					o2.frequency.value = 880;
+					o2.type = "sine";
+					g2.gain.value = 0.3;
+					o2.start();
+					o2.stop(c.currentTime + 0.15);
+				} catch (e) {}
+			}, 250);
+		} catch (e) {}
+	},
+
+	// ─── Permission ────────────────────────────────────────────
+	checkNotifPerm() {
+		const b = document.getElementById("notif-banner");
+		if (
+			!("Notification" in window) ||
+			Notification.permission === "granted"
+		)
+			b.style.display = "none";
+		else b.style.display = "flex";
+	},
+	async requestNotifPerm() {
+		if ("Notification" in window) {
+			const p = await Notification.requestPermission();
+			this.checkNotifPerm();
+			if (p === "granted")
+				showToast("🔔 Notifications enabled!", "success");
+		}
+	},
+
+	// ─── Actions ───────────────────────────────────────────────
+	async completeReminder(id) {
+		const r = await this.getReminder(id);
+		if (!r) return;
+		r.status = "completed";
+		r.completedAt = this.nowISO();
+		r.updatedAt = this.nowISO();
+		await this.addReminder(r);
+		showToast("✅ Reminder completed", "success");
+		this.render();
+	},
+	async snoozeReminder(id, min) {
+		if (!min) return;
+		const r = await this.getReminder(id);
+		if (!r) return;
+		r.status = "snoozed";
+		r.snoozedUntil = new Date(
+			Date.now() + parseInt(min) * 60000,
+		).toISOString();
+		r.updatedAt = this.nowISO();
+		await this.addReminder(r);
+		showToast(`💤 Snoozed for ${min} min`, "info");
+		this.render();
+	},
+
+	// ─── Modal ─────────────────────────────────────────────────
+	async openModal(id = null) {
+		const m = document.getElementById("rem-modal"),
+			t = document.getElementById("rem-modal-title");
+		document.getElementById("rem-form").reset();
+		document.getElementById("rem-form-id").value = "";
+		document.getElementById("rem-form-sound-url").value = "";
+		document.getElementById("rem-form-sound-name-val").value = "";
+		document.getElementById("rem-sound-name").textContent = "";
+		document.getElementById("rem-sound-label").textContent =
+			"Click to upload audio";
+		document.getElementById("rem-form-fires").value = 1;
+		document.getElementById("rem-form-interval").value = 30;
+		if (id) {
+			t.textContent = "Edit Reminder";
+			const r = await this.getReminder(id);
+			if (r) {
+				document.getElementById("rem-form-id").value = r.reminderId;
+				document.getElementById("rem-form-title").value = r.title;
+				document.getElementById("rem-form-desc").value =
+					r.description || "";
+				document.getElementById("rem-form-time").value = r.reminderTime
+					? r.reminderTime.slice(0, 16)
+					: "";
+				document.getElementById("rem-form-fires").value =
+					r.fireCount || 1;
+				document.getElementById("rem-form-interval").value =
+					r.fireInterval || 30;
+				document.getElementById("rem-form-rud").checked =
+					!!r.remindUntilDone;
+				if (r.soundUrl) {
+					document.getElementById("rem-form-sound-url").value =
+						r.soundUrl;
+					document.getElementById("rem-form-sound-name-val").value =
+						r.soundName || "";
+					document.getElementById("rem-sound-name").textContent =
+						r.soundName || "Custom sound";
+					document.getElementById("rem-sound-label").textContent =
+						"Sound loaded:";
+				}
+			}
+		} else {
+			t.textContent = "Add Reminder";
+			const d = new Date(Date.now() + 3600000),
+				iso =
+					d.getFullYear() +
+					"-" +
+					String(d.getMonth() + 1).padStart(2, "0") +
+					"-" +
+					String(d.getDate()).padStart(2, "0") +
+					"T" +
+					String(d.getHours()).padStart(2, "0") +
+					":" +
+					String(d.getMinutes()).padStart(2, "0");
+			document.getElementById("rem-form-time").value = iso;
+		}
+		m.classList.add("open");
+	},
+	closeModal() {
+		document.getElementById("rem-modal").classList.remove("open");
+	},
+	async saveReminder() {
+		const title = document.getElementById("rem-form-title").value.trim(),
+			time = document.getElementById("rem-form-time").value;
+		if (!title) {
+			showToast("Title required", "error");
+			return;
+		}
+		if (!time) {
+			showToast("Time required", "error");
+			return;
+		}
+		const eid = document.getElementById("rem-form-id").value,
+			data = {
+				title,
+				description: document
+					.getElementById("rem-form-desc")
+					.value.trim(),
+				reminderTime: new Date(time).toISOString(),
+				fireCount: Math.min(
+					20,
+					Math.max(
+						1,
+						parseInt(
+							document.getElementById("rem-form-fires").value,
+						) || 1,
+					),
+				),
+				fireInterval: Math.min(
+					300,
+					Math.max(
+						10,
+						parseInt(
+							document.getElementById("rem-form-interval").value,
+						) || 30,
+					),
+				),
+				remindUntilDone:
+					document.getElementById("rem-form-rud").checked,
+				soundUrl: document.getElementById("rem-form-sound-url").value,
+				soundName: document.getElementById("rem-form-sound-name-val")
+					.value,
+				updatedAt: this.nowISO(),
+			};
+		try {
+			if (eid) {
+				const ex = await this.getReminder(eid);
+				Object.assign(ex, data);
+				await this.addReminder(ex);
+				showToast("✏️ Reminder updated", "success");
+			} else {
+				let c = (await this.getSetting("remCounter")) || 0;
+				c++;
+				data.reminderId = this.genId(c);
+				data.firedCount = 0;
+				data.lastFiredAt = null;
+				data.status = "active";
+				data.snoozedUntil = null;
+				data.completedAt = null;
+				data.createdAt = this.nowISO();
+				await this.addReminder(data);
+				await this.setSetting("remCounter", c);
+				showToast("✅ Reminder created", "success");
+			}
+			this.closeModal();
+			this.render();
+		} catch (e) {
+			console.error(e);
+			showToast("Save failed", "error");
+		}
+	},
+
+	// ─── Delete ────────────────────────────────────────────────
+	openDeleteModal(id) {
+		document.getElementById("rem-delete-id").value = id;
+		document.getElementById("rem-delete-modal").classList.add("open");
+	},
+	closeDeleteModal() {
+		document.getElementById("rem-delete-modal").classList.remove("open");
+	},
+	async confirmDelete() {
+		const id = document.getElementById("rem-delete-id").value;
+		try {
+			await this.deleteRem(id);
+			this.closeDeleteModal();
+			showToast("🗑️ Reminder deleted", "success");
+			this.render();
+		} catch (e) {
+			console.error(e);
+			showToast("Delete failed", "error");
+		}
+	},
+
+	// ─── Import/Export ─────────────────────────────────────────
+	async exportData() {
+		try {
+			const a = await this.getAllReminders();
+			const b = new Blob(
+				[
+					JSON.stringify(
+						{
+							version: "1.0",
+							type: "reminders",
+							exportDate: this.nowISO(),
+							reminders: a,
+						},
+						null,
+						2,
+					),
+				],
+				{ type: "application/json" },
+			);
+			const l = document.createElement("a");
+			l.href = URL.createObjectURL(b);
+			l.download = `reminders-export-${todayStr()}.json`;
+			l.click();
+			URL.revokeObjectURL(l.href);
+			showToast("📦 Reminders exported", "success");
+		} catch (e) {
+			showToast("Export failed", "error");
+		}
+	},
+	handleImport(e) {
+		const f = e.target.files[0];
+		if (!f) return;
+		const r = new FileReader();
+		r.onload = (ev) => {
+			try {
+				const d = JSON.parse(ev.target.result);
+				if (!d.reminders || !Array.isArray(d.reminders)) {
+					showToast("Invalid file", "error");
+					return;
+				}
+				Rem.importedData = d;
+				document
+					.getElementById("rem-import-modal")
+					.classList.add("open");
+			} catch {
+				showToast("Invalid JSON", "error");
+			}
+		};
+		r.readAsText(f);
+		e.target.value = "";
+	},
+	async importReplace() {
+		if (!this.importedData) return;
+		try {
+			await this.clearAll();
+			for (const r of this.importedData.reminders)
+				await this.addReminder(r);
+			const mx = this.importedData.reminders.reduce((m, r) => {
+				const n = parseInt(r.reminderId.replace("R-", ""), 10);
+				return n > m ? n : m;
+			}, 0);
+			await this.setSetting("remCounter", mx);
+			this.closeImportModal();
+			showToast(
+				`🔄 Replaced ${this.importedData.reminders.length} reminders`,
+				"success",
+			);
+			this.importedData = null;
+			this.render();
+		} catch (e) {
+			showToast("Import failed", "error");
+		}
+	},
+	async importMerge() {
+		if (!this.importedData) return;
+		try {
+			let a = 0,
+				s = 0;
+			for (const r of this.importedData.reminders) {
+				if (await this.getReminder(r.reminderId)) s++;
+				else {
+					await this.addReminder(r);
+					a++;
+				}
+			}
+			const all = await this.getAllReminders(),
+				mx = all.reduce((m, r) => {
+					const n = parseInt(r.reminderId.replace("R-", ""), 10);
+					return n > m ? n : m;
+				}, 0);
+			await this.setSetting("remCounter", mx);
+			this.closeImportModal();
+			showToast(`🔀 ${a} added, ${s} skipped`, "success");
+			this.importedData = null;
+			this.render();
+		} catch (e) {
+			showToast("Import failed", "error");
+		}
+	},
+	closeImportModal() {
+		document.getElementById("rem-import-modal").classList.remove("open");
+	},
+
+	// ─── Accordion ─────────────────────────────────────────────
+	toggleAccordion(id) {
+		document.getElementById(id).classList.toggle("open");
+	},
+};
 
 // ─── Init ────────────────────────────────────────────────────
 async function init() {
-  try {
-    // Theme first (before any rendering to avoid flash)
-    initTheme();
+	try {
+		initTheme();
+		await initDB();
+		await Rem.initDB();
+		await autoCarryForward();
+		document.getElementById("date-picker").value = currentDate;
+		await renderProductivity();
+		Rem.checkNotifPerm();
+		Rem.startEngine();
 
-    await initDB();
-    await autoCarryForward();
+		// Theme
+		document
+			.getElementById("btn-theme-toggle")
+			.addEventListener("click", toggleTheme);
+		// Tabs
+		document
+			.querySelectorAll(".tab-btn")
+			.forEach((b) =>
+				b.addEventListener("click", () => switchTab(b.dataset.tab)),
+			);
+		// Date nav
+		document
+			.getElementById("btn-prev-day")
+			.addEventListener("click", async () => {
+				currentDate = getPreviousDay(currentDate);
+				await renderProductivity();
+			});
+		document
+			.getElementById("btn-next-day")
+			.addEventListener("click", async () => {
+				currentDate = getNextDay(currentDate);
+				await renderProductivity();
+			});
+		document
+			.getElementById("btn-today")
+			.addEventListener("click", async () => {
+				currentDate = todayStr();
+				await renderProductivity();
+			});
+		document
+			.getElementById("date-picker")
+			.addEventListener("change", async (e) => {
+				if (e.target.value) {
+					currentDate = e.target.value;
+					await renderProductivity();
+				}
+			});
+		// Task modal
+		document
+			.getElementById("btn-new-task")
+			.addEventListener("click", () => openTaskModal());
+		document
+			.getElementById("btn-save-task")
+			.addEventListener("click", (e) => {
+				e.preventDefault();
+				saveTask();
+			});
+		document
+			.getElementById("btn-cancel-task")
+			.addEventListener("click", closeTaskModal);
+		document
+			.getElementById("modal-close")
+			.addEventListener("click", closeTaskModal);
+		// Delete modal
+		document
+			.getElementById("btn-confirm-delete")
+			.addEventListener("click", confirmDelete);
+		document
+			.getElementById("btn-cancel-delete")
+			.addEventListener("click", closeDeleteModal);
+		// Carry forward
+		document
+			.getElementById("btn-carry-forward")
+			.addEventListener("click", carryForward);
+		// Task import/export
+		document
+			.getElementById("btn-export")
+			.addEventListener("click", exportData);
+		document
+			.getElementById("btn-import")
+			.addEventListener("click", () =>
+				document.getElementById("import-file-input").click(),
+			);
+		document
+			.getElementById("import-file-input")
+			.addEventListener("change", handleImportFile);
+		document
+			.getElementById("btn-import-replace")
+			.addEventListener("click", importReplace);
+		document
+			.getElementById("btn-import-merge")
+			.addEventListener("click", importMerge);
+		document
+			.getElementById("btn-cancel-import")
+			.addEventListener("click", closeImportModal);
+		// Card delegation
+		[
+			"cards-inprogress",
+			"cards-completed",
+			"cards-pending",
+			"cards-upcoming",
+		].forEach((id) => attachCardEvents(document.getElementById(id)));
+		attachCardEvents(document.getElementById("day-detail-tasks"));
+		// Calendar
+		document
+			.getElementById("btn-cal-prev")
+			.addEventListener("click", () => {
+				calendarMonth.setMonth(calendarMonth.getMonth() - 1);
+				closeDayDetail();
+				renderCalendar();
+			});
+		document
+			.getElementById("btn-cal-next")
+			.addEventListener("click", () => {
+				calendarMonth.setMonth(calendarMonth.getMonth() + 1);
+				closeDayDetail();
+				renderCalendar();
+			});
+		document
+			.getElementById("day-detail-close")
+			.addEventListener("click", closeDayDetail);
 
-    // Set date picker
-    document.getElementById("date-picker").value = currentDate;
+		// ─── Reminder Event Listeners ────────────────────────────
+		document
+			.getElementById("btn-new-reminder")
+			.addEventListener("click", () => Rem.openModal());
+		document
+			.getElementById("rem-btn-save")
+			.addEventListener("click", (e) => {
+				e.preventDefault();
+				Rem.saveReminder();
+			});
+		document
+			.getElementById("rem-btn-cancel")
+			.addEventListener("click", () => Rem.closeModal());
+		document
+			.getElementById("rem-modal-close")
+			.addEventListener("click", () => Rem.closeModal());
+		document
+			.getElementById("rem-btn-confirm-del")
+			.addEventListener("click", () => Rem.confirmDelete());
+		document
+			.getElementById("rem-btn-cancel-del")
+			.addEventListener("click", () => Rem.closeDeleteModal());
+		document
+			.getElementById("btn-rem-export")
+			.addEventListener("click", () => Rem.exportData());
+		document
+			.getElementById("btn-rem-import")
+			.addEventListener("click", () =>
+				document.getElementById("rem-import-file").click(),
+			);
+		document
+			.getElementById("rem-import-file")
+			.addEventListener("change", (e) => Rem.handleImport(e));
+		document
+			.getElementById("rem-btn-import-replace")
+			.addEventListener("click", () => Rem.importReplace());
+		document
+			.getElementById("rem-btn-import-merge")
+			.addEventListener("click", () => Rem.importMerge());
+		document
+			.getElementById("rem-btn-cancel-import")
+			.addEventListener("click", () => Rem.closeImportModal());
+		// Sound file upload
+		document
+			.getElementById("rem-form-sound-file")
+			.addEventListener("change", (e) => {
+				const f = e.target.files[0];
+				if (!f) return;
+				const r = new FileReader();
+				r.onload = (ev) => {
+					document.getElementById("rem-form-sound-url").value =
+						ev.target.result;
+					document.getElementById("rem-form-sound-name-val").value =
+						f.name;
+					document.getElementById("rem-sound-name").textContent =
+						f.name;
+					document.getElementById("rem-sound-label").textContent =
+						"Sound loaded:";
+				};
+				r.readAsDataURL(f);
+				e.target.value = "";
+			});
 
-    // Render
-    await renderProductivity();
-
-    // Theme toggle
-    document.getElementById("btn-theme-toggle").addEventListener("click", toggleTheme);
-
-    // Tab buttons
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
-    });
-
-    // Date navigation
-    document.getElementById("btn-prev-day").addEventListener("click", async () => {
-      currentDate = getPreviousDay(currentDate);
-      await renderProductivity();
-    });
-    document.getElementById("btn-next-day").addEventListener("click", async () => {
-      currentDate = getNextDay(currentDate);
-      await renderProductivity();
-    });
-    document.getElementById("btn-today").addEventListener("click", async () => {
-      currentDate = todayStr();
-      await renderProductivity();
-    });
-    document.getElementById("date-picker").addEventListener("change", async (e) => {
-      if (e.target.value) { currentDate = e.target.value; await renderProductivity(); }
-    });
-
-    // Task modal
-    document.getElementById("btn-new-task").addEventListener("click", () => openTaskModal());
-    document.getElementById("btn-save-task").addEventListener("click", (e) => { e.preventDefault(); saveTask(); });
-    document.getElementById("btn-cancel-task").addEventListener("click", closeTaskModal);
-    document.getElementById("modal-close").addEventListener("click", closeTaskModal);
-
-    // Delete modal
-    document.getElementById("btn-confirm-delete").addEventListener("click", confirmDelete);
-    document.getElementById("btn-cancel-delete").addEventListener("click", closeDeleteModal);
-
-    // Carry forward
-    document.getElementById("btn-carry-forward").addEventListener("click", carryForward);
-
-    // Import / Export
-    document.getElementById("btn-export").addEventListener("click", exportData);
-    document.getElementById("btn-import").addEventListener("click", () => {
-      document.getElementById("import-file-input").click();
-    });
-    document.getElementById("import-file-input").addEventListener("change", handleImportFile);
-    document.getElementById("btn-import-replace").addEventListener("click", importReplace);
-    document.getElementById("btn-import-merge").addEventListener("click", importMerge);
-    document.getElementById("btn-cancel-import").addEventListener("click", closeImportModal);
-
-    // Card event delegation — Productivity sections
-    ["cards-inprogress","cards-completed","cards-pending","cards-upcoming"].forEach(id => {
-      attachCardEvents(document.getElementById(id));
-    });
-
-    // Card event delegation — Calendar day detail panel
-    attachCardEvents(document.getElementById("day-detail-tasks"));
-
-    // Calendar navigation
-    document.getElementById("btn-cal-prev").addEventListener("click", () => {
-      calendarMonth.setMonth(calendarMonth.getMonth() - 1);
-      closeDayDetail();
-      renderCalendar();
-    });
-    document.getElementById("btn-cal-next").addEventListener("click", () => {
-      calendarMonth.setMonth(calendarMonth.getMonth() + 1);
-      closeDayDetail();
-      renderCalendar();
-    });
-    document.getElementById("day-detail-close").addEventListener("click", closeDayDetail);
-
-    // Keyboard: Escape closes modals
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        closeTaskModal();
-        closeDeleteModal();
-        closeImportModal();
-      }
-    });
-
-    // Click on backdrop closes modals
-    ["task-modal","delete-modal","import-modal"].forEach(id => {
-      document.getElementById(id).addEventListener("click", (e) => {
-        if (e.target === e.currentTarget) {
-          e.currentTarget.classList.remove("open");
-        }
-      });
-    });
-
-  } catch (err) {
-    console.error("Init error:", err);
-    showToast("Failed to initialize app", "error");
-  }
+		// Keyboard
+		document.addEventListener("keydown", (e) => {
+			if (e.key === "Escape") {
+				closeTaskModal();
+				closeDeleteModal();
+				closeImportModal();
+				Rem.closeModal();
+				Rem.closeDeleteModal();
+				Rem.closeImportModal();
+			}
+		});
+		// Backdrop clicks
+		[
+			"task-modal",
+			"delete-modal",
+			"import-modal",
+			"rem-modal",
+			"rem-delete-modal",
+			"rem-import-modal",
+		].forEach((id) => {
+			document.getElementById(id).addEventListener("click", (e) => {
+				if (e.target === e.currentTarget)
+					e.currentTarget.classList.remove("open");
+			});
+		});
+	} catch (e) {
+		console.error("Init error:", e);
+		showToast("Init failed", "error");
+	}
 }
-
-// Launch
 init();
