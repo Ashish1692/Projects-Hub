@@ -1169,17 +1169,44 @@
 
         function scheduleSessionSave() {
             if (restoring || !persistEnabled || !SUPPORTS_IDB) return;
+            sessionDirty = true;
             clearTimeout(sessionTimer);
             sessionTimer = setTimeout(function () { saveSession(); }, 600);
         }
 
-        function saveSession() {
+        // BUGFIX (browser crash on tab close): file handles used to be written into
+        // IndexedDB inside the session payload — including from the visibilitychange
+        // and pagehide handlers, i.e. while the tab was being torn down, and twice.
+        // Serialising a FileSystemFileHandle has to talk to the browser's own
+        // file-access service; doing that mid-teardown crashed the whole browser
+        // (all tabs, restored on relaunch). Handles now live under their own key and
+        // are only written during normal use, when one actually changes. The exit
+        // flush writes plain strings, and only if something is unsaved.
+        var DB_HANDLES_KEY = 'handles';
+        var sessionDirty = false, lastHandles = new Map();
+        function newUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+        function handlesChanged() {
+            var live = files.filter(function (f) { return f.handle; });
+            if (live.length !== lastHandles.size) return true;
+            return live.some(function (f) { return lastHandles.get(f.uid) !== f.handle; });
+        }
+
+        function saveHandles() {
+            var map = {}, next = new Map();
+            files.forEach(function (f) { if (f.handle) { map[f.uid] = f.handle; next.set(f.uid, f.handle); } });
+            return idbRun('readwrite', function (store) { return store.put(map, DB_HANDLES_KEY); })
+                .then(function () { lastHandles = next; });
+        }
+
+        function saveSession(exiting) {
             if (restoring || !persistEnabled || !SUPPORTS_IDB) return Promise.resolve(false);
             clearTimeout(sessionTimer);
             syncActive();
+            sessionDirty = false;
             var total = 0;
             var payload = {
-                v: 1,
+                v: 2,
                 savedAt: Date.now(),
                 activeIndex: activeIndex,
                 files: files.map(function (f) {
@@ -1188,15 +1215,18 @@
                     var body = f.content || '';
                     var tooBig = body.length > MAX_FILE_BYTES || (total += body.length) > MAX_TOTAL_BYTES;
                     return {
+                        uid: f.uid,
                         name: f.name,
                         content: tooBig ? '' : body,
                         truncated: !!tooBig,
                         saved: f.saved,
-                        handle: f.handle || null
+                        linked: !!f.handle          // plain flag; the handle itself is stored separately
                     };
                 })
             };
-            return idbRun('readwrite', function (store) { return store.put(payload, DB_KEY); })
+            // Never touch handles on the way out.
+            var handleStep = (!exiting && handlesChanged()) ? saveHandles().catch(function () { /* keep text save going */ }) : Promise.resolve();
+            return handleStep.then(function () { return idbRun('readwrite', function (store) { return store.put(payload, DB_KEY); }); })
                 .then(function () { return true; })
                 .catch(function (err) {
                     if (!quotaWarned) {
@@ -1209,11 +1239,12 @@
 
         async function restoreSession() {
             if (!SUPPORTS_IDB) return false;
-            var state;
+            var state, handleMap = null;
             try {
                 state = await idbRun('readonly', function (store) { return store.get(DB_KEY); });
+                handleMap = await idbRun('readonly', function (store) { return store.get(DB_HANDLES_KEY); });
             } catch (err) {
-                return false;
+                if (!state) return false;
             }
             if (!state || !Array.isArray(state.files) || !state.files.length) return false;
 
@@ -1222,11 +1253,18 @@
             try {
                 for (var i = 0; i < state.files.length; i++) {
                     var r = state.files[i] || {};
+                    var uid = r.uid || newUid();
+                    // New format keeps handles under their own key; older saves embedded them.
+                    var h = (r.uid && handleMap && handleMap[r.uid]) || r.handle || null;
+                    // Only count it as stored if it came from the new key, so a handle
+                    // migrated from the old format is re-saved under that key.
+                    if (h && handleMap && handleMap[r.uid] === h) lastHandles.set(uid, h);
                     var f = {
                         id: nextId++,
+                        uid: uid,
                         name: r.name || 'untitled.md',
                         content: r.content || '',
-                        handle: r.handle || null,
+                        handle: h,
                         saved: r.saved !== false,
                         writing: false,
                         pendingWrite: false,
@@ -1263,6 +1301,7 @@
                 restoring = false;
             }
 
+            if (handlesChanged()) scheduleSessionSave();   // migrate old-format handles / drop missing ones
             var msg = 'Restored ' + files.length + ' file' + (files.length === 1 ? '' : 's') + ' from your last session';
             showToast(msg, 'success');
             if (needPermission) {
@@ -1321,10 +1360,13 @@
         };
 
         // Best-effort flush on the way out — the 600 ms debounce may still be pending.
+        // Text only, at most once, and only when there is something unsaved.
+        function exitFlush() { if (sessionDirty) saveSession(true); }
         document.addEventListener('visibilitychange', function () {
-            if (document.visibilityState === 'hidden') saveSession();
+            if (document.visibilityState === 'hidden') exitFlush();
+            else if (handlesChanged()) scheduleSessionSave();   // back on the tab: store any handle we skipped
         });
-        window.addEventListener('pagehide', function () { saveSession(); });
+        window.addEventListener('pagehide', exitFlush);
 
         // ==========================================================================
         // File model
@@ -1332,6 +1374,7 @@
         function addFile(opts) {
             var f = {
                 id: nextId++,
+                uid: newUid(),
                 name: opts.name || 'untitled.md',
                 content: opts.content || '',
                 handle: opts.handle || null,
