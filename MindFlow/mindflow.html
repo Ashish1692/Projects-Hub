@@ -1,0 +1,2280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>MindFlow — Mind Map Builder</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+:root{
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+  --bg:#F2F2F7;--surface:#FFFFFF;--surface2:#F2F2F7;--canvas:#FBFBFD;
+  --ink:#1D1D1F;--muted:#636366;--line:#8E8E93;--sep:rgba(60,60,67,.2);
+  --accent:#0066D6;--accent-ink:#FFFFFF;--node:#FFFFFF;--node-stroke:#C7C7CC;
+  --grid:rgba(60,60,67,.24);--bar:rgba(249,249,251,.85);
+  --shadow:0 1px 3px rgba(0,0,0,.1),0 8px 28px rgba(0,0,0,.14);
+}
+[data-theme=dark]{
+  --bg:#000;--surface:#1C1C1E;--surface2:#2C2C2E;--canvas:#141416;
+  --ink:#F5F5F7;--muted:#AEAEB2;--line:#98989D;--sep:rgba(235,235,245,.22);
+  --accent:#4DA3FF;--accent-ink:#0A0A0C;--node:#2C2C2E;--node-stroke:#636366;
+  --grid:rgba(235,235,245,.2);--bar:rgba(28,28,30,.85);
+  --shadow:0 1px 3px rgba(0,0,0,.5),0 8px 28px rgba(0,0,0,.6);
+}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;overscroll-behavior:none;font-size:14px}
+.app{display:flex;flex-direction:column;height:100%}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.i{width:18px;height:18px;flex:none}
+/* Toolbar */
+.bar{display:flex;align-items:center;gap:6px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));
+  background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--sep);overflow-x:auto;white-space:nowrap;scrollbar-width:none;z-index:5}
+.bar::-webkit-scrollbar{display:none}
+.grp{display:flex;align-items:center;gap:2px;flex:none}
+.sepv{width:1px;height:22px;background:var(--sep);margin:0 6px;flex:none}
+.tb{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--accent);cursor:pointer;font-weight:500;font-size:14px}
+.tb:hover{background:var(--surface2)}
+.tb:disabled{opacity:.4;cursor:default}
+.tb.on{background:var(--accent);color:var(--accent-ink)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin-right:4px}
+.brand svg{width:24px;height:24px}
+.title{width:190px;height:34px;border:0;border-radius:10px;background:var(--surface2);color:var(--ink);padding:0 10px;font:inherit;font-weight:600}
+.zl{min-width:48px;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+/* Layout */
+.main{display:flex;flex:1;min-height:0;position:relative}
+.canvas{position:relative;flex:1;min-width:0;background-color:var(--canvas);
+  background-image:radial-gradient(circle,var(--grid) 1.1px,transparent 1.4px);background-size:24px 24px;overflow:hidden}
+.canvas.nogrid{background-image:none}
+#svg{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+#svg text{font-family:var(--font);pointer-events:none}
+.node{cursor:grab}
+.node.cont{cursor:default}
+.node.cont .hdr{cursor:grab}
+.node .sh{filter:drop-shadow(0 1px 2px rgba(0,0,0,.2))}
+.edge .hit{cursor:pointer}
+.node .lnk{cursor:pointer}
+.node .lnk:hover .lnkbg{fill:var(--accent);fill-opacity:.18}
+.hnd{cursor:crosshair}
+.hnd.rs{cursor:nwse-resize}
+.editor{position:absolute;display:none;margin:0;border:0;background:transparent;resize:none;outline:none;overflow:hidden;
+  text-align:center;white-space:pre;font-family:var(--font);caret-color:var(--accent);z-index:3;border-radius:8px;
+  box-shadow:0 0 0 2px var(--accent)}
+.reditor{white-space:pre;cursor:text;word-break:normal}
+.reditor span{white-space:pre}
+.fmtbar{position:absolute;display:none;z-index:5;background:var(--surface);border:1px solid var(--sep);border-radius:12px;padding:4px;gap:2px;align-items:center;box-shadow:0 6px 24px rgba(0,0,0,.18);font-family:var(--font)}
+.fmtbar>button{width:32px;height:32px;border:0;background:transparent;border-radius:8px;color:var(--ink);font-size:15px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;position:relative}
+.fmtbar>button:hover{background:var(--surface2)}
+.fmtbar>button.on{background:var(--accent);color:#fff}
+.fmtbar .fsep{width:1px;height:20px;background:var(--sep);margin:0 3px}
+.fmtbar .fA{font-weight:700;line-height:1;font-size:15px}
+.fmtbar .fbar{display:block;width:16px;height:4px;border-radius:2px;margin-top:2px;background:#FF3B30;border:1px solid rgba(0,0,0,.15)}
+.fpop{position:absolute;top:calc(100% + 6px);left:0;display:none;background:var(--surface);border:1px solid var(--sep);border-radius:12px;padding:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);width:236px;box-sizing:border-box}
+.fpop.show{display:block}
+.fpop .fsw{display:grid;grid-template-columns:repeat(8,1fr);gap:5px}
+.fpop .fsw button{width:22px;height:22px;border-radius:6px;border:1px solid rgba(0,0,0,.18);cursor:pointer;padding:0}
+.fpop .frow{display:flex;gap:6px;margin-top:8px;align-items:center}
+.fpop .frow button{flex:1;height:28px;border-radius:8px;border:1px solid var(--sep);background:var(--surface2);color:var(--ink);cursor:pointer;font-size:12px}
+.fpop .frow label{flex:1;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink);cursor:pointer}
+.fpop input[type=color]{width:28px;height:26px;border:0;padding:0;background:none;cursor:pointer}
+.tip{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);pointer-events:none;max-width:70%}
+.toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);background:rgba(28,28,30,.94);color:#fff;padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:6;white-space:nowrap}
+.toast.show{opacity:1}
+/* Shape library (UML mode) */
+.lib{width:252px;flex:none;background:var(--surface);border-right:1px solid var(--sep);overflow-y:auto;overflow-x:hidden;padding:4px 12px 24px;display:none}
+.lib.show{display:block}
+.lib h2{font-size:16px;margin:12px 0 2px}
+.lib>p{color:var(--muted);font-size:12px;line-height:1.4;margin:4px 0 6px}
+.lib details{border-bottom:1px solid var(--sep);padding:2px 0}
+.lib summary{cursor:pointer;font-weight:600;font-size:13px;padding:9px 0;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.lib summary::-webkit-details-marker{display:none}
+.lib summary::after{content:'›';font-size:18px;line-height:1;color:var(--muted);transform:rotate(90deg);transition:transform .15s}
+.lib details:not([open]) summary::after{transform:none}
+.pal{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:0 0 8px}
+.pal button{height:46px;border:1px solid transparent;background:transparent;border-radius:8px;cursor:grab;padding:3px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.pal button:hover{background:var(--surface2);border-color:var(--sep)}
+.pal svg{width:44px;height:36px;overflow:visible;pointer-events:none}
+.ctools{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 0 8px}
+.ctools button{min-width:0;line-height:1.2;display:flex;align-items:center;gap:5px;border:1px solid var(--sep);background:var(--surface2);border-radius:8px;padding:6px;font-size:12px;cursor:pointer;color:var(--ink);text-align:left;min-height:34px}
+.ctools button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:600}
+.ctools svg{width:28px;height:16px;flex:none;overflow:visible}
+.lib .sub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px}
+/* Inspector */
+.insp{width:300px;flex:none;background:var(--surface);border-left:1px solid var(--sep);overflow:auto;padding:6px 16px 24px}
+.insp h2{font-size:17px;margin:14px 0 2px;font-weight:700}
+.insp h3{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px}
+.insp p{color:var(--muted);font-size:13px;line-height:1.45;margin:6px 0}
+.insp textarea,.insp input[type=text],.insp select{width:100%;border:1px solid var(--sep);background:var(--surface2);color:var(--ink);border-radius:10px;padding:8px 10px;font:inherit;resize:vertical}
+.insp textarea.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+.seg{display:flex;background:var(--surface2);border-radius:9px;padding:2px;gap:2px}
+.seg button{flex:1;border:0;background:transparent;border-radius:7px;padding:7px 4px;font-size:13px;cursor:pointer;min-width:0}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.shapes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.shapes button,.act{border:1px solid var(--sep);background:var(--surface2);border-radius:9px;padding:8px 4px;cursor:pointer;font-size:13px}
+.shapes button{font-size:12px;padding:7px 2px}
+.shapes button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{border:1px solid var(--sep);background:var(--surface2);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:12px}
+.sws{display:flex;flex-wrap:wrap;gap:8px}
+.sw{width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,.3);padding:0;cursor:pointer;position:relative}
+.sw.on{outline:2px solid var(--accent);outline-offset:2px}
+.sw.auto{background:linear-gradient(135deg,var(--surface) 46%,#FF3B30 46%,#FF3B30 54%,var(--surface) 54%)}
+.sw.cust{background:conic-gradient(#FF3B30,#FFCC00,#34C759,#30B0C7,#007AFF,#AF52DE,#FF3B30);overflow:hidden}
+.sw.cust input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper b{min-width:34px;text-align:center;font-variant-numeric:tabular-nums}
+.stepper button{width:34px;height:34px;border-radius:9px;border:1px solid var(--sep);background:var(--surface2);cursor:pointer;font-size:18px;line-height:1}
+.pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,38px);gap:6px;justify-content:center;margin:4px 0}
+.pad button{border:1px solid var(--sep);background:var(--surface2);border-radius:9px;cursor:pointer;font-size:16px}
+.pad button:hover{background:var(--accent);color:var(--accent-ink)}
+.pad .c{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rels{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rels button{min-width:0;line-height:1.2;display:flex;align-items:center;gap:6px;border:1px solid var(--sep);background:var(--surface2);border-radius:8px;padding:6px;font-size:12px;cursor:pointer;text-align:left}
+.rels button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:600}
+.rels svg{width:30px;height:14px;flex:none;overflow:visible}
+.icons{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.icons button{border:1px solid var(--sep);background:var(--surface2);border-radius:8px;height:32px;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink);font-size:11px}
+.icons button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);color:var(--accent)}
+.icons svg{width:17px;height:17px}
+.imgprev{display:block;max-width:100%;max-height:120px;border-radius:8px;margin:0 auto 8px;border:1px solid var(--sep)}
+.act:hover{background:var(--surface)}
+.act.danger{color:#C62828}
+[data-theme=dark] .act.danger{color:#FF8A80}
+kbd{font-family:var(--font);background:var(--surface2);border:1px solid var(--sep);border-radius:5px;padding:0 5px;font-size:12px}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;font-size:13px;align-items:center}
+/* Menu + dialog */
+.menu{position:fixed;display:none;min-width:230px;background:var(--surface);border:1px solid var(--sep);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:20}
+.menu.show{display:block}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:8px;cursor:pointer}
+.menu button:hover{background:var(--accent);color:var(--accent-ink)}
+.menu hr{border:0;border-top:1px solid var(--sep);margin:5px 0}
+dialog{border:0;border-radius:18px;padding:0;width:min(980px,94vw);max-height:90vh;background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+dialog[open]{display:flex;flex-direction:column}
+dialog::backdrop{background:rgba(0,0,0,.4);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.dh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--sep)}
+.dh h2{margin:0;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;padding:18px;overflow:auto}
+.card{background:var(--surface2);border:1px solid var(--sep);border-radius:14px;padding:10px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.card:hover{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.card b{font-size:15px;margin-top:6px}
+.card span{font-size:13px;color:var(--muted)}
+.thumb{background:#fff;border-radius:10px;height:160px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.thumb svg{width:100%;height:100%}
+#printArea{display:none}
+@media (max-width:900px){
+  .lbl{display:none}
+  .insp{position:absolute;right:0;bottom:0;left:0;width:auto;max-height:52%;border-left:0;border-top:1px solid var(--sep);border-radius:16px 16px 0 0;transform:translateY(105%);transition:transform .25s;box-shadow:var(--shadow);z-index:4}
+  .insp.open{transform:none}
+  .lib{position:absolute;left:0;top:0;bottom:0;z-index:4;box-shadow:var(--shadow)}
+  .tip{display:none}
+}
+@media (pointer:coarse){
+  .tb{height:44px;min-width:44px;justify-content:center}
+  .sw{width:34px;height:34px}
+  .seg button,.shapes button,.act{padding:11px 4px}
+}
+@media print{
+  body>*:not(#printArea){display:none!important}
+  html,body{height:auto;background:#fff}
+  #printArea{display:block}
+  #printArea h1{font:600 12pt var(--font);margin:0 0 4mm;color:#1D1D1F}
+  #printArea .pwrap{position:relative;width:var(--pw);height:var(--ph)}
+  #printArea svg{width:var(--pw);height:var(--ph);display:block}
+  #printArea .plink{position:absolute;display:block}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+<style id="pageStyle"></style>
+</head>
+<body>
+<div class="app">
+  <header class="bar" role="toolbar" aria-label="Toolbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0066D6"/><circle cx="16" cy="16" r="4" fill="#fff"/><circle cx="7.5" cy="9" r="2.5" fill="#fff"/><circle cx="25" cy="9" r="2.5" fill="#fff"/><circle cx="7.5" cy="23" r="2.5" fill="#fff"/><circle cx="25" cy="23" r="2.5" fill="#fff"/><path d="M9 10l5 4M23 10l-5 4M9 22l5-4M23 22l-5-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span class="lbl">MindFlow</span>
+    </div>
+    <input id="title" class="title" aria-label="Map title" maxlength="80">
+    <span class="sepv"></span>
+    <div class="grp">
+      <button class="tb" data-cmd="templates" title="Templates"><i data-i="grid"></i><span class="lbl">Templates</span></button>
+      <button class="tb" data-cmd="file" title="File menu"><i data-i="file"></i><span class="lbl">File</span></button>
+    </div>
+    <span class="sepv"></span>
+    <div class="grp">
+      <button class="tb" data-cmd="undo" id="bUndo" title="Undo (Ctrl/⌘ Z)" aria-label="Undo"><i data-i="undo"></i></button>
+      <button class="tb" data-cmd="redo" id="bRedo" title="Redo (Ctrl/⌘ Shift Z)" aria-label="Redo"><i data-i="redo"></i></button>
+    </div>
+    <span class="sepv"></span>
+    <div class="grp">
+      <button class="tb" data-cmd="addnode" title="Add node (Tab adds a child)"><i data-i="plus"></i><span class="lbl">Node</span></button>
+      <button class="tb" data-cmd="connect" id="bConnect" title="Connect two nodes"><i data-i="link"></i><span class="lbl">Connect</span></button>
+      <button class="tb" data-cmd="uml" id="bUml" title="UML mode — shape library and UML connectors"><i data-i="shapes"></i><span class="lbl">UML</span></button>
+    </div>
+    <span class="sepv"></span>
+    <div class="grp">
+      <button class="tb" data-cmd="zoomout" title="Zoom out" aria-label="Zoom out"><i data-i="minus"></i></button>
+      <span class="zl" id="zl">100%</span>
+      <button class="tb" data-cmd="zoomin" title="Zoom in" aria-label="Zoom in"><i data-i="plus"></i></button>
+      <button class="tb" data-cmd="fit" title="Fit to screen (0)" aria-label="Fit to screen"><i data-i="fit"></i></button>
+    </div>
+    <span class="sepv"></span>
+    <div class="grp">
+      <button class="tb" data-cmd="grid" id="bGrid" title="Toggle grid"><i data-i="dots"></i><span class="lbl">Grid</span></button>
+      <button class="tb" data-cmd="snap" id="bSnap" title="Snap to grid"><i data-i="snap"></i><span class="lbl">Snap</span></button>
+      <button class="tb" data-cmd="theme" id="bTheme" title="Appearance"><i data-i="moon"></i><span class="lbl" id="themeLbl">Auto</span></button>
+      <button class="tb" data-cmd="print" title="Print / Save PDF (Ctrl/⌘ P)"><i data-i="print"></i><span class="lbl">Print</span></button>
+      <button class="tb" data-cmd="side" id="bSide" title="Inspector" aria-label="Inspector"><i data-i="side"></i></button>
+    </div>
+  </header>
+  <main class="main">
+    <aside class="lib" id="lib" aria-label="Shape library"></aside>
+    <section class="canvas" id="canvas">
+      <svg id="svg" role="application" aria-label="Mind map canvas"><g id="world"><g id="lanes"></g><g id="edges"></g><g id="nodes"></g><g id="overlay"></g></g></svg>
+      <textarea id="editor" class="editor" spellcheck="false" aria-label="Edit text"></textarea>
+      <div id="reditor" class="editor reditor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Edit node text"></div>
+      <div id="fmtbar" class="fmtbar" role="toolbar" aria-label="Text formatting">
+        <button data-f="bold" title="Bold (Ctrl/⌘ B)" aria-label="Bold"><b>B</b></button>
+        <button data-f="italic" title="Italic (Ctrl/⌘ I)" aria-label="Italic"><i style="font-family:Georgia,serif">I</i></button>
+        <button data-f="underline" title="Underline (Ctrl/⌘ U)" aria-label="Underline"><u>U</u></button>
+        <span class="fsep"></span>
+        <button data-pop="fc" title="Text colour" aria-label="Text colour"><span class="fA">A</span><span class="fbar" id="fcBar"></span></button>
+        <button data-pop="hl" title="Highlight colour" aria-label="Highlight colour"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l-4 4v3h3l4-4M9 11l6-6 4 4-6 6zM14 6l4 4"/></svg><span class="fbar" id="hlBar"></span></button>
+        <span class="fsep"></span>
+        <button data-f="clear" title="Clear formatting" aria-label="Clear formatting"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 5h12M12 5l-3 14M4 20L20 4"/></svg></button>
+        <div class="fpop" id="fpop"></div>
+      </div>
+      <div class="tip" id="tip">Double-click to rename · drag a <b>+</b> handle to add or connect · double-click empty space to add</div>
+      <div class="toast" id="toast" role="status"></div>
+    </section>
+    <aside class="insp" id="inspector" aria-label="Inspector"></aside>
+  </main>
+</div>
+<div class="menu" id="menu" role="menu">
+  <button data-m="new"><i data-i="filenew"></i>New blank map</button>
+  <button data-m="open"><i data-i="folder"></i>Open JSON…</button>
+  <hr>
+  <button data-m="json"><i data-i="download"></i>Save as JSON</button>
+  <button data-m="png"><i data-i="download"></i>Export PNG (image only)</button>
+  <button data-m="svg"><i data-i="download"></i>Export SVG (clickable links)</button>
+  <hr>
+  <button data-m="print"><i data-i="print"></i>Print / Save as PDF (clickable links)…</button>
+</div>
+<dialog id="tpl" aria-labelledby="tplh">
+  <div class="dh"><h2 id="tplh">Templates</h2><button class="tb" data-close aria-label="Close">Done</button></div>
+  <div class="grid" id="tplGrid"></div>
+</dialog>
+<div id="printArea"></div>
+<input type="file" id="file" accept=".json,application/json" hidden>
+<input type="file" id="imgFile" accept="image/*" hidden>
+<script>
+'use strict';
+/* =====================================================================
+   MindFlow — offline mind-map & diagram builder. Vanilla JS + SVG, no dependencies.
+   ===================================================================== */
+const $=(s,r=document)=>r.querySelector(s);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const FONT='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const OPP={l:'r',r:'l',t:'b',b:'t'};
+const SIDE_N={l:[-1,0],r:[1,0],t:[0,-1],b:[0,1]};
+const KEY='mindflow.v1';
+/* ---------- icons ---------- */
+const ICONS={
+  undo:'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
+  redo:'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3',
+  plus:'M12 5v14M5 12h14', minus:'M5 12h14',
+  fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
+  print:'M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z',
+  download:'M12 3v12m0 0-4-4m4 4 4-4M5 21h14',
+  grid:'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  file:'M6 3h8l4 4v14H6zM14 3v4h4',
+  filenew:'M6 3h8l4 4v14H6zM14 3v4h4M12 11v6M9 14h6',
+  folder:'M3 7h6l2 2h10v10H3z',
+  link:'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  dots:'M6 6h.01M12 6h.01M18 6h.01M6 12h.01M12 12h.01M18 12h.01M6 18h.01M12 18h.01M18 18h.01',
+  snap:'M5 5h14v14H5zM5 12h14M12 5v14',
+  moon:'M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z',
+  side:'M4 5h16v14H4zM15 5v14',
+  shapes:'M3 4h8v6H3zM17 3.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zM7 13l4 7H3zM13 14h8v6h-8z'
+};
+const ico=n=>`<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[n]}"/></svg>`;
+document.querySelectorAll('i[data-i]').forEach(el=>{el.outerHTML=ico(el.dataset.i)});
+/* ---------- node icon library (24×24 stroke icons) ---------- */
+const NICONS={
+  star:'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z',
+  check:'M5 12.5l4.5 4.5L19 7.5',
+  done:'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM8 12.5l3 3 5-6',
+  x:'M6 6l12 12M18 6L6 18',
+  alert:'M12 3.5L2.5 20h19zM12 10v4.5M12 17.5h.01',
+  info:'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 11v6M12 7.5h.01',
+  question:'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',
+  idea:'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
+  target:'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zM12 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2z',
+  flag:'M5 21V4M5 4h11l-2 4 2 4H5',
+  heart:'M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.5 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z',
+  zap:'M13 2L4 14h7l-1 8 9-12h-7z',
+  rocket:'M5 15c-1.5 1-2 4-2 6 2 0 5-.5 6-2M9 15l-3-3c1.5-4 5-9 15-9 0 10-5 13.5-9 15zM15 9h.01',
+  trophy:'M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v4M8 21h8',
+  user:'M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM4.5 20a7.5 7.5 0 0 1 15 0',
+  users:'M9 5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zM2.5 20a6.5 6.5 0 0 1 13 0M16 5.2a3.5 3.5 0 0 1 0 6.6M18 14a6.5 6.5 0 0 1 3.5 6',
+  calendar:'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
+  clock:'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 7v5l3.5 2',
+  mail:'M3 6h18v12H3zM3 7l9 6 9-6',
+  phone:'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z',
+  home:'M3 11l9-7 9 7M5 9.5V20h5v-6h4v6h5V9.5',
+  work:'M3 8h18v12H3zM9 8V5h6v3M3 13h18',
+  money:'M12 3v18M16.5 7H10a2.5 2.5 0 0 0 0 5h4a2.5 2.5 0 0 1 0 5H7',
+  chart:'M4 20h16M7 16v-5M12 16V7M17 16v-8',
+  settings:'M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1',
+  lock:'M6 11h12v10H6zM8.5 11V7.5a3.5 3.5 0 0 1 7 0V11',
+  shield:'M12 3l8 3v6c0 4.5-3.5 8-8 9-4.5-1-8-4.5-8-9V6z',
+  bookmark:'M6 3h12v18l-6-4.5L6 21z',
+  tag:'M3 12V3h9l9 9-9 9zM7.5 7.5h.01',
+  book:'M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2zM4 21a2 2 0 0 1 2-2h14',
+  doc:'M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6',
+  code:'M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16',
+  search:'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4',
+  cloud:'M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5z',
+  globe:'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z',
+  pin:'M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 7a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z',
+  cart:'M3 4h2.5l2.2 11h10.6l2-8H6.5M9 20h.01M17 20h.01',
+  link:'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1'
+};
+const nIcoSVG=(k,x,y,sz,col,sw)=>`<path transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${(sz/24).toFixed(4)})" d="${NICONS[k]}" fill="none" stroke="${col}" stroke-width="${sw||2}" stroke-linecap="round" stroke-linejoin="round"/>`;
+/* Only allow web / mail / phone links (blocks javascript: and similar). */
+function safeUrl(u){
+  u=String(u||'').trim();if(!u)return'';
+  if(/^(https?:|mailto:|tel:)/i.test(u))return u;
+  if(/^[a-z][a-z0-9+.-]*:/i.test(u))return'';
+  if(/^[^\s/@]+@[^\s/@]+\.[^\s/@]+$/.test(u))return'mailto:'+u;
+  return'https://'+u.replace(/^\/+/,'');
+}
+/* ---------- colours ---------- */
+const VIVID=['#007AFF','#5856D6','#AF52DE','#FF2D55','#FF3B30','#FF9500','#FFCC00','#34C759','#30B0C7','#8E8E93'];
+const SOFT=['#D6E4FF','#E4DDFB','#F1DBFA','#FFDDE4','#FFDAD6','#FFE9C7','#FFF3BF','#D9F2E3','#D2EEF3','#E5E5EA'];
+const EXTRA=['#1D1D1F','#FFFFFF'];
+function lum(hex){
+  const c=hex.replace('#','');
+  const [r,g,b]=[0,2,4].map(i=>parseInt(c.substr(i,2),16)/255).map(v=>v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4));
+  return .2126*r+.7152*g+.0722*b;
+}
+function textOn(hex){ // pick the text colour with better contrast (works on any platform)
+  if(!/^#[0-9a-f]{6}$/i.test(hex)) return '#1D1D1F';
+  const L=lum(hex), cw=1.05/(L+.05), cd=(L+.05)/(0.0122+.05);
+  return cw*1.1>=cd?'#FFFFFF':'#1D1D1F';
+}
+const colorOf=c=>!c?'var(--line)':c==='ink'?'var(--ink)':c;
+/* ---------- text measuring ---------- */
+const mctx=document.createElement('canvas').getContext('2d');
+function textWidth(t,size,bold,it){mctx.font=`${it?'italic ':''}${bold?600:400} ${size}px ${FONT}`;return mctx.measureText(t).width;}
+/* ---------- shapes ----------
+   px/py: text padding · sx/sy: content scale (diamond) · ew/eh: extra size · dx/dy: text offset */
+const SHAPES={pill:{px:18,py:10},round:{px:14,py:9},rect:{px:14,py:8},ellipse:{px:28,py:15},outline:{px:10,py:5},underline:{px:8,py:7},text:{px:6,py:5},point:{px:0,py:0},card:{px:26,py:24},
+  diamond:{px:16,py:10,sx:1.5,sy:1.7},para:{px:30,py:10},doc:{px:16,py:10,dy:-5,eh:10},cyl:{px:16,py:10,dy:6,eh:16},note:{px:16,py:10,dx:-3},
+  package:{px:16,py:10,dy:7,eh:14},component:{px:16,py:12,dx:8,ew:16},node3d:{px:16,py:12,dy:5,dx:-5,eh:10,ew:10},circle:{px:14,py:14,sq:1},
+  subproc:{px:24,py:10},manual:{px:16,py:10,dy:5,eh:10},prep:{px:28,py:10},offpage:{px:16,py:8,dy:-7,eh:14},delay:{px:16,py:10,dx:-8,ew:16},
+  store:{px:18,py:10,dx:8,ew:16},class:{px:12,py:0},actor:{px:4,py:0},
+  lane:{px:0,py:0},frame:{px:0,py:0},init:{px:0,py:0},final:{px:0,py:0},barh:{px:0,py:0},barv:{px:0,py:0}};
+const SHAPE_LABELS=[['pill','Pill'],['round','Round'],['rect','Box'],['ellipse','Oval'],['outline','Outline'],['underline','Line'],['text','Text'],['point','Dot'],['card','Card']];
+const DIAGRAM_SHAPES=[['diamond','Diamond'],['para','Data'],['doc','Document'],['cyl','Database'],['note','Note'],['package','Package'],['component','Comp.'],['node3d','Node 3D'],['circle','Circle'],['subproc','Subproc'],['manual','Manual'],['prep','Hexagon'],['offpage','Off-page'],['delay','Delay'],['store','Store'],['class','Class'],['actor','Actor']];
+const NOTEXT=new Set(['point','init','final','barh','barv']);
+const CONTAINER=new Set(['lane','frame']);
+const isCont=n=>!!n&&CONTAINER.has(n.shape);
+const ROWBOX=new Set(['diamond','para','doc','cyl','note','package','component','node3d','circle','subproc','manual','prep','offpage','delay','store','class','actor','lane','frame']);
+const hsOf=n=>n.hs||(n.shape==='frame'?26:n.hd==='l'?56:44);
+const headerOnly=n=>n.shape==='lane'&&(n.hd==='l'?n.w<=hsOf(n)+1:n.h<=hsOf(n)+1);
+/* =====================================================================
+   Rich text: n.rich = [[{t,b?,i?,u?,c?,h?}, …], …]  (one array per line)
+   n.text always holds the plain text, so older files and plain nodes still work.
+   ===================================================================== */
+const plainOf=rl=>rl.map(l=>l.map(r=>r.t).join('')).join('\n');
+function richLines(n){
+  if(n.rich&&plainOf(n.rich)===String(n.text||''))return n.rich;
+  return String(n.text||'').split('\n').map(t=>[{t}]);
+}
+const hasRich=n=>!!n.rich&&plainOf(n.rich)===String(n.text||'')&&n.rich.some(l=>l.some(r=>r.b!=null||r.i||r.u||r.c||r.h));
+const runBold=(r,n)=>r.b!=null?r.b:!!n.bold;
+const runW=(r,n)=>textWidth(r.t,n.size,runBold(r,n),r.i);
+const lineW=(l,n)=>l.reduce((a,r)=>a+runW(r,n),0)||textWidth(' ',n.size,n.bold);
+function richSVG(n,P,col,off,lft){
+  const rl=richLines(n),lh=P.lh,sz=n.size;let s='';
+  rl.forEach((l,i)=>{
+    const y=P.rc+(i-(rl.length-1)/2)*lh+off,w=lineW(l,n);
+    let x=lft?P.tx-P.tw/2:P.tx-w/2;
+    l.forEach(r=>{
+      if(!r.t)return;const rw=runW(r,n);
+      if(r.h)s+=`<rect x="${x.toFixed(1)}" y="${(y-lh/2+1).toFixed(1)}" width="${rw.toFixed(1)}" height="${lh-2}" rx="2" fill="${esc(r.h)}"/>`;
+      const fc=r.c?esc(r.c):col;
+      s+=`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="start" dominant-baseline="central" font-size="${sz}" font-weight="${runBold(r,n)?600:400}"${r.i?' font-style="italic"':''} fill="${fc}" xml:space="preserve" style="white-space:pre">${esc(r.t)}</text>`;
+      if(r.u)s+=`<rect x="${x.toFixed(1)}" y="${(y+sz*.48).toFixed(1)}" width="${rw.toFixed(1)}" height="${Math.max(1,sz*.07).toFixed(2)}" fill="${fc}"/>`;
+      x+=rw;
+    });
+  });
+  return s;
+}
+/* ---- editor <-> model ---- */
+function toHex(c){
+  if(!c)return null;c=String(c).trim();
+  if(c==='transparent')return null;
+  const m=c.match(/^rgba?\(([^)]+)\)$/i);
+  if(m){const p=m[1].split(/[\s,\/]+/).filter(Boolean).map(Number);if(p.length>3&&p[3]===0)return null;
+    return'#'+p.slice(0,3).map(v=>Math.round(v).toString(16).padStart(2,'0')).join('').toUpperCase();}
+  if(/^#[0-9a-f]{3}$/i.test(c))return('#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3]).toUpperCase();
+  if(/^#[0-9a-f]{6}$/i.test(c))return c.toUpperCase();
+  mctx.fillStyle='#000';mctx.fillStyle=c;return/^#/.test(mctx.fillStyle)?mctx.fillStyle.toUpperCase():toHex(mctx.fillStyle);
+}
+function runsToHTML(rl){
+  const h=rl.map(l=>l.map(r=>{
+    const st=[];if(r.b!=null)st.push('font-weight:'+(r.b?'bold':'normal'));if(r.i)st.push('font-style:italic');
+    if(r.u)st.push('text-decoration:underline');if(r.c)st.push('color:'+r.c);if(r.h)st.push('background-color:'+r.h);
+    return st.length?`<span style="${st.join(';')}">${esc(r.t)}</span>`:esc(r.t);
+  }).join('')).join('<br>');
+  return h+(rl.length>1&&!rl[rl.length-1].some(r=>r.t)?'<br>':'');
+}
+function domToRuns(root,n,baseCol){
+  const lines=[[]],BLOCK=/^(DIV|P|LI|H[1-6])$/;
+  const walk=(el,st)=>{
+    for(const c of el.childNodes){
+      if(c.nodeType===3){if(c.data)lines[lines.length-1].push({...st,t:c.data.replace(/\u00A0/g,' ').replace(/[\r\n]+/g,'')});continue;}
+      if(c.nodeType!==1)continue;
+      if(c.tagName==='BR'){lines.push([]);continue;}
+      const s={...st},cs=c.style,tg=c.tagName;
+      if(tg==='B'||tg==='STRONG')s.b=true;
+      if(tg==='I'||tg==='EM')s.i=true;
+      if(tg==='U')s.u=true;
+      if(tg==='FONT'&&c.getAttribute('color'))s.c=toHex(c.getAttribute('color'));
+      if(cs){
+        const fw=cs.fontWeight;if(fw)s.b=fw==='bold'||fw==='bolder'||+fw>=600;
+        if(cs.fontStyle)s.i=cs.fontStyle==='italic'||cs.fontStyle==='oblique';
+        const td=cs.textDecorationLine||cs.textDecoration;if(td)s.u=/underline/.test(td);
+        if(cs.color)s.c=toHex(cs.color);
+        if(cs.backgroundColor)s.h=toHex(cs.backgroundColor);
+      }
+      const blk=BLOCK.test(tg);
+      if(blk&&lines[lines.length-1].length)lines.push([]);
+      walk(c,s);
+      if(blk&&lines[lines.length-1].length)lines.push([]);
+    }
+  };
+  walk(root,{});
+  if(lines.length>1&&!lines[lines.length-1].length)lines.pop();
+  const base=toHex(baseCol);
+  return lines.map(l=>{
+    const out=[];
+    l.forEach(r=>{
+      const o={t:r.t};
+      if(r.b!=null&&r.b!==!!n.bold)o.b=r.b;if(r.i)o.i=true;if(r.u)o.u=true;
+      if(r.c&&r.c!==base)o.c=r.c;if(r.h)o.h=r.h;
+      const p=out[out.length-1];
+      if(p&&p.b===o.b&&p.i===o.i&&p.u===o.u&&p.c===o.c&&p.h===o.h)p.t+=o.t;else if(o.t)out.push(o);
+    });
+    return out.length?out:[{t:''}];
+  });
+}
+function setRich(n,rl){
+  n.text=plainOf(rl);
+  if(rl.some(l=>l.some(r=>r.b!=null||r.i||r.u||r.c||r.h)))n.rich=rl;else delete n.rich;
+}
+/* ---------- UML class compartments ---------- */
+function classMetrics(n){
+  const s2=Math.max(10,n.size-1),lh2=Math.round(s2*1.4);
+  const at=String(n.attrs||'').split('\n').filter(x=>x.trim()!==''),op=String(n.ops||'').split('\n').filter(x=>x.trim()!=='');
+  const st=n.stereo?`«${n.stereo}»`:'',sh=st?Math.round(s2*1.35):0;
+  const aw=Math.max(0,...at.map(t=>textWidth(t,s2,false)),...op.map(t=>textWidth(t,s2,false)),st?textWidth(st,s2,false,true):0);
+  return{s2,lh2,at,op,st,sh,aw,aH:Math.max(1,at.length)*lh2+12,oH:Math.max(1,op.length)*lh2+12};
+}
+/* Content layout: [card title] / [image] / [icon  text  link-badge] */
+function layout(n){
+  const m=SHAPES[n.shape]||SHAPES.round;
+  const lines=String(n.text||'').split('\n'),lh=Math.round(n.size*1.3);
+  const tw=Math.ceil(hasRich(n)?Math.max(...richLines(n).map(l=>lineW(l,n))):Math.max(...lines.map(l=>textWidth(l||' ',n.size,n.bold)))),th=lines.length*lh;
+  const cont=isCont(n);
+  const ic=!cont&&n.icon&&NICONS[n.icon]?Math.round(n.size*1.25):0,icg=ic?Math.round(n.size*.45):0;
+  const lk=!cont&&n.link?Math.round(Math.max(12,n.size*.95)):0,lkg=lk?Math.round(Math.max(6,n.size*.45)):0;
+  const rowW=ic+icg+tw+lkg+lk,rowH=Math.max(th,ic,lk);
+  const iw=!cont&&n.img?(n.iw||140):0,ih=iw?Math.round(iw*(n.ir||.75)):0,ig=iw?8:0;
+  const tt=n.shape==='card'&&n.title?String(n.title):'',ts=Math.round(n.size*1.3);
+  const hdH=tt?Math.round(ts*1.3)+16:0,hdW=tt?Math.ceil(textWidth(tt,ts,true))+44:0;
+  const bodyH=ih+ig+rowH,extra=tt?hdH+12:0;
+  let cw=Math.max(rowW,iw,hdW-2*m.px),ch=bodyH+extra,C=null,topH=0;
+  if(m.sx){cw*=m.sx;ch*=m.sy;}
+  cw+=m.ew||0;ch+=m.eh||0;
+  if(n.shape==='class'){C=classMetrics(n);topH=C.sh+rowH+14;cw=Math.max(cw,C.aw);ch=topH+C.aH+C.oH;}
+  if(n.shape==='actor'){cw=Math.max(rowW,40);ch=66+rowH+4;}
+  return{m,lines,lh,tw,th,ic,icg,lk,lkg,rowW,rowH,iw,ih,ig,tt,ts,hdH,bodyH,cw,ch,C,topH};
+}
+function place(n){ // positions relative to node centre
+  const L=layout(n),hw=n.w/2,hh=n.h/2,m=L.m;
+  const top=L.tt?(-hh+12+L.hdH+hh)/2-L.bodyH/2:-L.bodyH/2;
+  L.imgX=-L.iw/2;L.imgY=top;
+  L.rc=top+L.ih+L.ig+L.rowH/2;
+  const rx=-L.rowW/2;
+  L.icX=rx;L.tx=rx+L.ic+L.icg+L.tw/2;L.lkX=rx+L.ic+L.icg+L.tw+L.lkg;
+  const dx=m.dx||0,dy=m.dy||0;
+  if(dx||dy){L.rc+=dy;L.imgY+=dy;L.tx+=dx;L.icX+=dx;L.lkX+=dx;L.imgX+=dx;}
+  if(n.shape==='class'){const r0=-hh+7+L.C.sh+L.rowH/2;L.imgY+=r0-L.rc;L.rc=r0;L.stY=-hh+7+L.C.sh/2;}
+  if(n.shape==='actor'){const r0=hh-2-L.rowH/2;L.imgY+=r0-L.rc;L.rc=r0;}
+  if(isCont(n)){
+    const hs=hsOf(n);
+    if(n.shape==='frame'){L.tx=-hw+12+L.tw/2;L.rc=-hh+hs/2;}
+    else if(n.hd==='l'){L.tx=-hw+Math.min(hs,n.w)/2;L.rc=0;L.rot=true;}
+    else{L.tx=0;L.rc=-hh+Math.min(hs,n.h)/2;}
+  }
+  L.custom=ROWBOX.has(n.shape);
+  return L;
+}
+const FIXED={point:[10,10],init:[28,28],final:[32,32]};
+function fit(n){
+  if(FIXED[n.shape]){[n.w,n.h]=FIXED[n.shape];return n;}
+  if(n.shape==='barh'){n.w=Math.max(30,n.mw||150);n.h=9;return n;}
+  if(n.shape==='barv'){n.w=9;n.h=Math.max(30,n.mh||150);return n;}
+  if(isCont(n)){
+    const f=n.shape==='frame';
+    n.w=Math.max(f?120:hsOf(n),n.mw||(f?480:720));n.h=Math.max(f?80:hsOf(n),n.mh||(f?320:170));
+    if(n.hd==='l'&&n.shape==='lane')n.w=Math.max(n.w,hsOf(n));
+    return n;
+  }
+  const L=layout(n),light=n.shape==='text'||n.shape==='underline'||n.shape==='outline';
+  let w=Math.max(Math.ceil(L.cw)+L.m.px*2,light?24:44,n.mw||0),h=Math.max(Math.ceil(L.ch)+L.m.py*2,light?22:32,n.mh||0);
+  if(n.shape==='diamond'){w=Math.max(w,60);h=Math.max(h,44);}
+  if(n.shape==='delay')w=Math.max(w,h+20);
+  if(L.m.sq){w=h=Math.max(w,h);}
+  n.w=w;n.h=h;
+  return n;
+}
+const DEF={shape:'round',fill:null,tc:null,size:14,bold:false};
+function mk(text,x,y,o){return fit(Object.assign({id:uid(),text,x,y},DEF,o||{}));}
+function ln(a,b,o){return Object.assign({id:uid(),from:a.id,to:b.id,fa:'auto',ta:'auto',style:'curve',color:null,width:2,dash:'',arrow:'none',label:'',bend:{x:0,y:0}},o||{});}
+/* ---------- state ---------- */
+let doc={title:'Untitled mind map',nodes:[],edges:[],view:{x:0,y:0,k:1}};
+const ui={sel:new Set(),edge:null,editing:null,mode:'select',connectFrom:null,grid:true,snap:false,theme:'auto',side:true,
+  preview:null,marquee:null,hover:null,dragging:false,uml:false,ctype:null,crel:null,labelNext:false};
+const N=id=>doc.nodes.find(n=>n.id===id);
+const E=id=>doc.edges.find(e=>e.id===id);
+let clip=null;
+const svg=$('#svg'),world=$('#world'),lanesL=$('#lanes'),edgesL=$('#edges'),nodesL=$('#nodes'),overlayL=$('#overlay'),canvas=$('#canvas'),editor=$('#editor'),reditor=$('#reditor'),insp=$('#inspector'),lib=$('#lib');
+/* =====================================================================
+   Templates
+   ===================================================================== */
+const TEMPLATES=[
+ {id:'central',name:'Central mind map',desc:'One idea, branches in all four directions.',build(){
+   const c=mk('Central idea',0,0,{shape:'pill',fill:'#007AFF',size:22,bold:true});
+   const nodes=[c],edges=[];
+   [['r','Right idea','#34C759',250,0],['l','Left idea','#AF52DE',-250,0],['t','Top idea','#FF9500',0,-150],['b','Bottom idea','#30B0C7',0,150]].forEach(([d,t,f,x,y])=>{
+     const n=mk(t,x,y,{fill:f,size:16});nodes.push(n);edges.push(ln(c,n,{fa:d,ta:OPP[d],color:f,width:4}));
+   });
+   const r=nodes[1];
+   [['Detail',-46],['Another detail',46]].forEach(([t,dy])=>{
+     const s=mk(t,0,r.y+dy,{shape:'underline',fill:'#34C759',size:14});s.x=r.x+r.w/2+60+s.w/2;
+     nodes.push(s);edges.push(ln(r,s,{fa:'r',ta:'l',color:'#34C759'}));
+   });
+   return {title:'Central mind map',nodes,edges};
+ }},
+ {id:'swot',name:'SWOT analysis',desc:'Strengths, Weaknesses, Opportunities, Threats.',build(){
+   const c=mk('SWOT Analysis',0,0,{shape:'round',size:22,bold:true});
+   const nodes=[c],edges=[];
+   const cats=[
+     ['Strengths',-1,-95,'#5E4BD8','#D9D3F7',['Core competencies','Unique resources','Competitive advantages']],
+     ['Weaknesses',-1,95,'#3B6FD8','#BBD6F8',['Resource gaps','Process inefficiencies','Skill shortages']],
+     ['Opportunities',1,-95,'#3F8099','#B9DCE6',['Market trends','New technologies','Partnership potential']],
+     ['Threats',1,95,'#3F7F6A','#BFE3D6',['Competition','Market changes','Regulatory risks']]];
+   cats.forEach(([name,sx,y,col,soft,leaves])=>{
+     const cat=mk(name,sx*235,y,{shape:'round',fill:col,size:16,bold:true});
+     nodes.push(cat);
+     edges.push(ln(c,cat,{fa:sx<0?'l':'r',ta:sx<0?'r':'l',color:col,width:7}));
+     leaves.forEach((t,i)=>{
+       const lf=mk(t,0,y+(i-1)*48,{fill:soft,size:13});
+       lf.x=cat.x+sx*(cat.w/2+60+lf.w/2);
+       nodes.push(lf);
+       edges.push(ln(cat,lf,{fa:sx<0?'l':'r',ta:sx<0?'r':'l',color:col,width:2}));
+     });
+   });
+   return {title:'SWOT analysis',nodes,edges};
+ }},
+ {id:'fishbone',name:'Fishbone (cause & effect)',desc:'Ishikawa diagram: 6 categories feeding a problem.',build(){
+   const nodes=[],edges=[];
+   const tail=mk('',-560,0,{shape:'point'});
+   const head=mk('Problem\nstatement',440,0,{shape:'pill',fill:'#1D1D1F',size:16,bold:true});
+   const J=[-300,-60,180].map(x=>mk('',x,0,{shape:'point'}));
+   nodes.push(tail,...J,head);
+   const chain=[tail,...J,head];
+   for(let i=0;i<chain.length-1;i++) edges.push(ln(chain[i],chain[i+1],{style:'straight',color:'ink',width:3}));
+   const tops=['3. Measurement','2. Method','1. Machine'], bots=['6. Materials','5. Manpower','4. Milieu (Environment)'];
+   [[tops,-1],[bots,1]].forEach(([names,sg])=>names.forEach((nm,i)=>{
+     const jx=J[i].x, cat=mk(nm,jx-110,sg*200,{fill:'#FFCC00',size:13,bold:true});
+     nodes.push(cat);
+     edges.push(ln(J[i],cat,{style:'straight',color:'ink',width:2}));
+     [0.3,0.55,0.8].forEach(t=>{
+       const dot=mk('',jx-110*t,sg*200*t,{shape:'point'});
+       const cause=mk('Cause',0,dot.y,{shape:'outline',size:11,tc:'muted'});
+       cause.x=dot.x-16-cause.w/2;
+       nodes.push(dot,cause);
+       edges.push(ln(dot,cause,{style:'straight',color:'ink',width:1.5}));
+     });
+   }));
+   return {title:'Fishbone diagram',nodes,edges};
+ }},
+ {id:'budget',name:'Budget planning',desc:'Income, expenses, savings, investment and more.',build(){
+   const S=.85;
+   const c=mk('Budget Planning',0,0,{shape:'pill',fill:'#E8812F',size:22,bold:true});
+   const nodes=[c],edges=[];
+   const cats=[
+     ['Investment','#EEA93A',-182,-251,[['Venture Capital',-533,-441],['Stable return',-173,-514]]],
+     ['Income','#F0BA3C',155,-251,[['Annual Income',151,-532],['Estimate Income',430,-414]]],
+     ['Expenses','#F2C940',515,-37,[['Shopping',722,-252],['Rent',787,-90],['Bills',812,85]]],
+     ['Savings/Deposit','#E8812F',210,228,[['Medical reasons',589,257],['House/Car repair',513,421],['How to Maintain?',171,459]]],
+     ['Retirement','#EA912F',-294,228,[['Retirement Plan',-365,438],['Budget',-639,245]]],
+     ['Insurance','#EC9F3B',-470,-33,[['Health',-708,70],['House',-682,-156]]]];
+   cats.forEach(([name,col,x,y,leaves])=>{
+     const cat=mk(name,x*S,y*S,{shape:'pill',fill:col,size:17,bold:true});
+     nodes.push(cat);edges.push(ln(c,cat,{style:'straight',color:col,width:2.5,arrow:'end'}));
+     leaves.forEach(([t,lx,ly])=>{
+       const lf=mk(t,lx*S,ly*S,{shape:'underline',fill:col,tc:'muted',size:16,bold:true});
+       nodes.push(lf);edges.push(ln(cat,lf,{style:'straight',color:col,width:2.5,arrow:'end'}));
+     });
+   });
+   return {title:'Budget planning',nodes,edges};
+ }},
+ {id:'rivers',name:'Most important rivers',desc:'Region → river → facts, with hint prompts.',build(){
+   const nodes=[],edges=[];
+   const blue='#CCE3EE',orange='#E8993A';
+   const c=mk('Most Important\nRivers In The World',0,0,{shape:'rect',fill:blue,size:24,bold:true});
+   nodes.push(c);
+   const regions=[
+     ['Europe',-249,-299,-1,[['Volga',-378,-392,'cities','City'],['Danube',-388,-206,'countries','Country']]],
+     ['America',265,-288,1,[['Mississippi',425,-380,'states','State'],['Amazon',410,-196,'countries','Country']]],
+     ['Asia',-295,217,-1,[['Yangtze',-422,124,'provinces','Province'],['Mekong',-421,309,'countries','Country']]],
+     ['Africa',302,222,1,[['Nile',417,130,'countries','Country'],['Zambezi',438,315,'countries','Country']]]];
+   regions.forEach(([rn,rx,ry,sg,rivers])=>{
+     const reg=mk(rn,rx,ry,{shape:'pill',fill:blue,size:16,bold:true});
+     nodes.push(reg);edges.push(ln(c,reg,{color:orange,width:3,fa:sg<0?'l':'r',ta:sg<0?'r':'l'}));
+     rivers.forEach(([nm,x,y,what,hint])=>{
+       const rv=mk(nm,x,y,{shape:'text',size:17,bold:true});
+       nodes.push(rv);edges.push(ln(reg,rv,{style:'elbow',color:'ink',width:1,fa:sg<0?'l':'r',ta:sg<0?'r':'l'}));
+       const items=[[`Which ${what} does the ${nm} flow through?`,hint],['Length',`Length of ${nm} River`],['Source',`Source of ${nm} River`],['Mouth',`Mouth of ${nm} River`],['Tributaries','Tributary'],['Did you know?',null]];
+       items.forEach(([lab,h],i)=>{
+         const ly=y+(i-2.5)*30;
+         const lf=mk(lab,0,ly,{shape:'text',size:12,bold:lab==='Did you know?'});
+         lf.x=x+sg*(rv.w/2+40+lf.w/2);
+         nodes.push(lf);edges.push(ln(rv,lf,{style:'straight',color:'ink',width:1,fa:sg<0?'l':'r',ta:sg<0?'r':'l'}));
+         if(h){
+           const hn=mk(h,0,ly,{shape:'text',size:12,tc:'muted'});
+           hn.x=lf.x+sg*(lf.w/2+34+hn.w/2);
+           nodes.push(hn);edges.push(ln(lf,hn,{style:'straight',color:'ink',width:1,fa:sg<0?'l':'r',ta:sg<0?'r':'l'}));
+         }
+       });
+     });
+   });
+   return {title:'Most important rivers',nodes,edges};
+ }},
+ {id:'cards',name:'Mind map cards',desc:'Titled cards around a central card — great for a process.',build(){
+   const ink={style:'elbow',corner:'square',color:'ink',width:2};
+   const c=mk('MIND\nMAP',0,-250,{shape:'card',fill:'#E9A23B',tc:'#E9A23B',size:54,bold:true,mw:300});
+   const nodes=[c],edges=[];
+   const W=330,cards=[
+     ['IDENTIFICATION','#BCE0F5',-450,-40,'l','The first step is to clearly define\nthe problem. Many people rush to\nfix things without understanding\nwhat is actually wrong. Take time\nto gather and observe the situation.'],
+     ['ANALYSIS','#CCC4F0',450,-40,'r','Why behind the problem. Identify\npatterns, causes, and connections\nbetween factors. Ask questions\nlike "What led to this?" or "What\nkeeps it happening?"'],
+     ['CREATIVITY','#E8C3F0',-470,320,'b','This is where innovation shines.\nBrainstorm freely and think beyond\nthe obvious. The best solutions\noften come from unexpected\nideas or combinations.'],
+     ['DECISION','#C3E8DC',0,320,'b','Evaluate all options carefully and\nchoose the one with the best\nbalance between cost and long-\nterm benefit. A wise decision\ncombines logic with intuition.'],
+     ['EVALUATION','#EEE7A6',470,320,'b','Once the solution is applied,\nmonitor the results closely. Did it\nsolve the problem completely?\nWhat could be better? Reflection\nturns experience into wisdom.']];
+   cards.forEach(([title,fill,x,y,fa,text])=>{
+     const n=mk(text,x,y,{shape:'card',title,fill,size:14,mw:W});nodes.push(n);
+     const e=ln(c,n,Object.assign({fa,ta:'t'},ink));
+     if(fa==='b'){const busY=135;e.bend={x:0,y:busY-((c.y+c.h/2)+(n.y-n.h/2))/2};}
+     edges.push(e);
+   });
+   return {title:'Mind map cards',nodes,edges};
+ }},
+ {id:'org',name:'Organisation chart',desc:'Leader → departments → heads → managers → team.',build(){
+   const nodes=[],edges=[],line={style:'elbow',corner:'square',color:'#8E6B66',width:2,fa:'b',ta:'t'};
+   const brown='#7A5550',xs=i=>(i-3.5)*132;
+   const root=mk('(Who is the leader in the organization?)',0,0,{shape:'pill',fill:'#C47F6E',tc:'#FFFFFF',size:18,bold:true});
+   nodes.push(root);
+   [0,1].forEach(d=>{
+     const dx=(xs(d*4)+xs(d*4+3))/2;
+     const dep=mk('What is the\ndepartment or division?',dx,115,{shape:'pill',fill:'#F4DCD5',tc:'#8B5E55',size:15});
+     const head=mk('(Who is in charge of this department?)',dx,215,{shape:'text',tc:brown,size:13});
+     nodes.push(dep,head);edges.push(ln(root,dep,line),ln(dep,head,line));
+     [0,1].forEach(m=>{
+       const i=d*4+m*2,mx=(xs(i)+xs(i+1))/2;
+       const mg=mk('Who is the middle\nmanager or supervisor?',mx,315,{shape:'text',tc:brown,size:13});
+       nodes.push(mg);edges.push(ln(head,mg,line));
+       [0,1].forEach(k=>{const tm=mk('Who is the\nteam member?',xs(i+k),425,{shape:'text',tc:brown,size:13});nodes.push(tm);edges.push(ln(mg,tm,line));});
+     });
+   });
+   return {title:'Organisation chart',nodes,edges};
+ }},
+ {id:'5w',name:"5W's analysis",desc:'Who, What, Where, When, Why — with prompt questions.',build(){
+   const nodes=[],edges=[];
+   const root=mk("5W's",0,0,{shape:'round',fill:'#5CB85C',tc:'#FFFFFF',size:18,bold:true});nodes.push(root);
+   const ws=[['Who',['(Who is participating?)','(Who is responsible?)','(Who will be affected?)']],
+     ['What',['(What is the topic, problem, or goal?)','(What needs to be achieved?)']],
+     ['Where',['(Where is it happening?)','(Where does it apply?)','(Where is the focus?)']],
+     ['When',['(When will it occur?)','(When did it start or end?)','(When is it necessary?)']],
+     ['Why',['(Why is it important or necessary?)','(Why does it matter?)','(Why now?)']]];
+   ws.forEach(([w,qs],i)=>{
+     const n=mk(w,(i-2)*285,95,{shape:'round',fill:'#EFEFF1',tc:'#1D1D1F',size:15});
+     nodes.push(n);edges.push(ln(root,n,{style:'elbow',corner:'square',color:'#3A3A3C',width:1.5,fa:'b',ta:'t'}));
+     qs.forEach((q,j)=>{
+       const qn=mk(q,0,95+50+j*34,{shape:'text',tc:'muted',size:12});qn.x=n.x+22+qn.w/2;
+       nodes.push(qn);edges.push(ln(n,qn,{style:'elbow',corner:'square',color:'#8E8E93',width:1.2,fa:'b',ta:'l'}));
+     });
+   });
+   return {title:"5W's analysis",nodes,edges};
+ }},
+ {id:'timeline',name:'Timeline',desc:'Milestones along a line, details alternating above and below.',build(){
+   const nodes=[],edges=[],O='#EE9A2E';
+   const root=mk('Timeline of Bar',0,0,{shape:'round',fill:'#E8743B',tc:'#FFFFFF',size:14,bold:true});nodes.push(root);
+   const ms=[
+     ['May 2000','Grand Opening Celebration',['Vibrant launch party with live music and DJ','Signature cocktail menu unveiled','Introduction of loyalty programs for\nearly patrons']],
+     ['September 2003','Renovation and Theme Nights',['Redesigned interior with themed decorations','Launch of weekly theme nights\n(e.g., Retro Mondays, Jazz Thursdays)','Engaging customers with costume\ncontests and live performances']],
+     ['June 2008','Mixology Masterclass and New Menu',['Mixology masterclasses for enthusiasts','Revamped menu featuring\ninnovative cocktails','Collaboration with renowned mixologists\nfor exclusive concoctions']],
+     ['March 2013','Community Engagement and\nLocal Art Showcase',['Hosting fundraisers for local charities','Art exhibitions featuring local talents','Collaborative events with nearby\nbusinesses for a sense of community']],
+     ['September 2022','Online Experience',['Launch of an online ordering platform','Virtual happy hours and mixology classes','Engaging customers through social media\nchallenges and giveaways']]];
+   let prev=root,prevSide='r';
+   ms.forEach(([date,title,items],i)=>{
+     const d=mk(date,root.w/2+150+i*300,0,{shape:'text',size:13,bold:true});
+     nodes.push(d);edges.push(ln(prev,d,{style:'straight',color:O,width:3,fa:prevSide,ta:'l'}));prev=d;
+     const up=i%2===1,sq={style:'elbow',corner:'square',color:O,width:2};
+     const ev=mk(title,0,0,{shape:'text',size:13,bold:true,al:'left'});
+     const its=items.map(t=>mk(t,0,0,{shape:'text',size:12,al:'left'}));
+     const gap=14,stack=its.reduce((a,n)=>a+n.h+gap,0);
+     ev.y=up?-(40+stack+ev.h/2+10):60+ev.h/2;
+     ev.x=d.x+18+ev.w/2;nodes.push(ev);edges.push(ln(d,ev,Object.assign({fa:up?'t':'b',ta:'l'},sq)));
+     let y=ev.y+ev.h/2+18;
+     its.forEach(it=>{it.y=y+it.h/2;it.x=ev.x+18+it.w/2;y+=it.h+gap;nodes.push(it);edges.push(ln(ev,it,Object.assign({fa:'b',ta:'l'},sq)));});
+   });
+   return {title:'Timeline',nodes,edges};
+ }},
+ {id:'flow',name:'Decision flowchart',desc:'API request flow with YES / NO labelled connectors.',build(){
+   const nodes=[],edges=[],add=(t,x,y,o)=>{const n=mk(t,x,y,o);nodes.push(n);return n;};
+   const R=c=>({shape:'round',fill:c,mw:150,mh:60,size:14}),D=c=>({shape:'diamond',fill:c,mw:150,mh:80,size:13}),P=c=>({shape:'pill',fill:c,mw:150,mh:56,size:14});
+   const B='#5B8DEF',G='#5FAE6E',O='#E9963A',Y='#E2C23A',Rd='#DD6B5B',O2='#E5822E';
+   const api=add('API endpoint',0,0,R(B)),auth=add('Authorized?',0,125,D(B)),authn=add('Authenticated?',-380,240,D(B));
+   const cached=add('Cached?',-620,365,D(G)),fresh=add('Within\nfreshness\nlifetime?',-820,500,Object.assign(D(G),{mh:96,size:12}));
+   const reval=add('Revalidated\nwith server?',-640,630,Object.assign(D(G),{mh:90,size:12}));
+   const store=add('Store in cache',-400,500,R(G)),ok=add('Return code\n2xx',-400,735,R(G)),done=add('Request\ncomplete',-400,850,P(G));
+   const bad=add('Request\nmalformed',-110,395,R(O)),inv=add('Invalid or missing\nquery parameter',85,395,Object.assign(R(Y),{mw:170})),err=add("Something's wrong\n(temporary)",290,395,Object.assign(R(Rd),{mw:170}));
+   const r400=add('Return code\n400',-110,520,R(O)),r422=add('Return code\n422',85,520,R(Y)),r5=add('Return code\n5xx',290,520,R(Rd));
+   const rem=add('Remedy error\nand try again',-12,645,P(O)),retry=add('Try again or\ncontact support',290,645,P(Rd));
+   const key=add('API key invalid or\nrate limit reached',570,395,Object.assign(R(O2),{mw:175})),r403=add('Return code\n403',570,520,R(O2)),rem2=add('Remedy error\nand try again',570,645,P(O2));
+   const E0={style:'elbow',color:'ink',width:1.5,arrow:'end'},c=(a,b,fa,ta,label)=>edges.push(ln(a,b,Object.assign({fa,ta,label:label||''},E0)));
+   c(api,auth,'b','t');c(auth,authn,'l','t','YES');c(auth,key,'r','t','NO');
+   c(authn,cached,'l','t','YES');c(authn,bad,'r','t','NO');c(authn,inv,'r','t');c(authn,err,'r','t');
+   c(cached,fresh,'l','t','YES');c(cached,store,'r','t','NO');
+   c(fresh,reval,'r','t','NO');c(fresh,ok,'b','l','YES');c(reval,ok,'b','l','YES');c(reval,store,'r','l','NO');
+   c(store,ok,'b','t');c(ok,done,'b','t');
+   c(bad,r400,'b','t');c(inv,r422,'b','t');c(err,r5,'b','t');c(r400,rem,'b','t');c(r422,rem,'b','t');c(r5,retry,'b','t');
+   c(key,r403,'b','t');c(r403,rem2,'b','t');
+   return {title:'Decision flowchart',nodes,edges};
+ }},
+ {id:'swimh',name:'Cross-functional (horizontal lanes)',desc:'Swimlane process with lanes as rows and Yes/No connectors.',build(){
+   const nodes=[],edges=[],add=(t,x,y,o)=>{const n=mk(t,x,y,o);nodes.push(n);return n;};
+   const X0=70,X1=1333,W=X1-X0,cx=(X0+X1)/2,HB='#AFD5EC',SK='#79AFCF';
+   add('Software Service Cross-Functional Process',cx,98.5,{shape:'lane',hd:'t',hs:67,mw:W,mh:67,fill:HB,sk:SK,size:20,bold:true,tc:'#34495E'});
+   [['Customer',132,280],['Sales',280,430],['Technical\nsupport',430,578],['Tester',578,727],['Development',727,875]].forEach(([t,a,b])=>
+     add(t,cx,(a+b)/2,{shape:'lane',hd:'l',hs:75,mw:W,mh:b-a,fill:HB,bf:'#FFFFFF',sk:SK,size:17,bold:true,tc:'#34495E'}));
+   const G={shape:'rect',fill:'#B4DE8C',sk:'#78B04A',tc:'#1D1D1F',size:14,mw:164,mh:74};
+   const Dm={shape:'diamond',fill:'#F7C448',sk:'#D9A21E',tc:'#1D1D1F',size:14,mw:144,mh:88};
+   const Fin={shape:'pill',fill:'#F48B3A',sk:'#D06A1B',tc:'#1D1D1F',size:14,mw:164,mh:50};
+   const req=add('Customer request\nhelp or report errors',285,213,Object.assign({},G,{shape:'pill'}));
+   const fin1=add('Finished',701,174,Fin),conf1=add('Confirm with\ncustomer',701,261,G),more=add('More feedback',904,211,G);
+   const fin2=add('Finished',1190,174,Fin),conf2=add('Confirm with\ncustomer',1190,261,G);
+   const sales=add('Sales issue',286,359,Dm),resI=add('Resolve the issue and\nrespond customer',540,359,Object.assign({},G,{mw:182}));
+   const newI=add('New issue',286,519,Dm),resS=add('Resolve solution',539,519,G),more2=add('Get more details\nfrom customer',904,519,G),resS2=add('Resolve solution',1190,519,G);
+   const test=add('Test the issue',285,656,G),repro=add('Reproduced the\nissue',540,656,Object.assign({},Dm,{mw:164,mh:96})),solved=add('Resolved?',1190,644,Dm);
+   const errR=add('Error report',540,802,{shape:'doc',fill:'#5DA1EC',sk:'#3477C2',tc:'#1D1D1F',size:14,mw:164,mh:76});
+   const tech=add('Technical analysis',944,802,G),fix=add('Fix the issue',1190,802,G);
+   const E0={style:'elbow',corner:'square',color:'#4A4A4A',width:1.3,arrow:'end'},c=(a,b,fa,ta,label,o)=>edges.push(ln(a,b,Object.assign({fa,ta,label:label||''},E0,o||{})));
+   c(req,sales,'b','t');c(req,newI,'r','t');
+   c(sales,resI,'r','l','Yes');c(sales,newI,'b','t','No');
+   c(resI,conf1,'r','b');c(conf1,fin1,'t','b');
+   c(newI,resS,'r','l','No');c(resS,conf1,'r','b');c(newI,test,'b','t','Yes');
+   c(test,repro,'r','l');c(repro,more2,'r','b','No');c(more2,repro,'l','t','',{bend:{x:212,y:0}});c(more2,more,'t','b','',{arrow:'both'});
+   c(repro,errR,'b','t','Yes');c(errR,tech,'r','l');c(tech,fix,'r','l');c(fix,solved,'t','b');
+   c(solved,tech,'l','t','No');c(solved,resS2,'t','b','Yes');c(resS2,conf2,'t','b');c(conf2,fin2,'t','b');
+   return {title:'Software Service Cross-Functional Process',nodes,edges};
+ }},
+ {id:'swimv',name:'Cross-functional (vertical lanes)',desc:'Order process with lanes as columns and coloured Yes/No paths.',build(){
+   const nodes=[],edges=[],add=(t,x,y,o)=>{const n=mk(t,x,y,o);nodes.push(n);return n;};
+   const xs=[10,281,553,825,1097,1369],Y0=18,Y1=1110;
+   ['Customer','Sales','Contracts','Legal','Fulfillment'].forEach((t,i)=>add(t,(xs[i]+xs[i+1])/2,(Y0+Y1)/2,{shape:'lane',hd:'t',hs:54,mw:xs[i+1]-xs[i],mh:Y1-Y0,fill:'#EFEFEF',bf:'#FFFFFF',sk:'#C9C9C9',size:19,tc:'#333333'}));
+   const Pl={shape:'pill',fill:'#F0E2A0',tc:'#333333',size:16,mw:166,mh:92},Rc={shape:'rect',fill:'#EDB27E',tc:'#333333',size:16,mw:166,mh:84},Dm={shape:'diamond',fill:'#DE6B79',tc:'#FFFFFF',size:16,mw:166,mh:110};
+   const po=add('Customer\nsubmits PO',145,177,Pl),rep=add('Rep Logs PO,\nEnters Order',417,177,Rc),rev=add('Contracts Agent\nReviews Order',689,177,Rc);
+   const std=add('Standard\nTerms?',689,332,Dm),appr=add('Agent Approves\nOrder',689,488,Rc),okA=add('Attorney Marks it\nOK, Returns to\nAgent',961,571,Rc);
+   const chg=add('Changes\nAcceptable?',961,708,Dm),reqA=add('Agent Requests\nApproval',689,708,Rc),noA=add('Attorney Marks it\nNot OK, Returns\nto Agent',961,845,Rc);
+   const cancel=add('Agent Cancels\nOrder',689,914,Rc),notif=add('Rep Is Notified',417,1048,Pl),notS=add('Order Is\nNot Shipped',689,1048,Pl);
+   const pick=add('Pick Order Log\nShipment',1233,705,Rc),ship=add('Order Is\nShipped',1233,1048,Pl);
+   const E0={style:'elbow',corner:'square',color:'#808080',width:1.6,arrow:'end'},YES={color:'#3AA5A5'},NO={color:'#DE6B79'};
+   const c=(a,b,fa,ta,label,o)=>edges.push(ln(a,b,Object.assign({fa,ta,label:label||''},E0,o||{})));
+   c(po,rep,'r','l');c(rep,rev,'r','l');c(rev,std,'b','t');
+   c(std,appr,'b','t','Yes',YES);c(std,reqA,'l','l','No',NO);
+   c(appr,pick,'r','t');c(reqA,chg,'r','l');
+   c(chg,okA,'t','b','Yes',YES);c(okA,appr,'l','b');
+   c(chg,noA,'b','t','No',NO);c(noA,cancel,'l','t');
+   c(cancel,notif,'l','t');c(cancel,notS,'b','t');c(pick,ship,'b','t');
+   return {title:'Order process (cross-functional)',nodes,edges};
+ }},
+ {id:'umlclass',name:'UML class diagram',desc:'Classes, interface, inheritance, composition and multiplicities.',build(){
+   const nodes=[],edges=[],add=(t,x,y,o)=>{const n=mk(t,x,y,o);nodes.push(n);return n;};
+   const C=o=>Object.assign({shape:'class',fill:'#FFF8DC',sk:'#1D1D1F',tc:'#1D1D1F',size:14,bold:true},o);
+   const cust=add('Customer',-430,-170,C({attrs:'- id: int\n- name: String\n- email: String',ops:'+ placeOrder(): Order\n+ getOrders(): List<Order>'}));
+   const order=add('Order',0,-170,C({attrs:'- id: int\n- date: Date\n- status: OrderStatus',ops:'+ total(): Money\n+ addItem(p: Product, q: int)\n+ checkout(): void'}));
+   const ship=add('Shippable',420,-170,C({stereo:'interface',fill:'#E6F0FF',attrs:'',ops:'+ ship(): void\n+ trackingId(): String'}));
+   const item=add('OrderItem',0,150,C({attrs:'- quantity: int\n- price: Money',ops:'+ subtotal(): Money'}));
+   const prod=add('Product',420,150,C({attrs:'- sku: String\n- name: String\n- price: Money',ops:'+ isAvailable(): bool'}));
+   const pay=add('Payment',-430,150,C({stereo:'abstract',attrs:'- amount: Money',ops:'+ authorize(): bool'}));
+   const cc=add('CreditCard',-560,420,C({attrs:'- number: String\n- expiry: Date',ops:''}));
+   const pp=add('PayPal',-300,420,C({attrs:'- account: String\n- token: String',ops:''}));
+   const note=add('Orders cannot change\nafter checkout.',0,-400,{shape:'note',fill:'#FFFBEA',sk:'#9A8F5A',tc:'#1D1D1F',size:13});
+   const E0={style:'elbow',corner:'square',color:'ink',width:1.4,arrow:'none'},c=(a,b,fa,ta,o)=>edges.push(ln(a,b,Object.assign({fa,ta},E0,o||{})));
+   c(cust,order,'r','l',{label:'places',l0:'1',l1:'0..*'});
+   c(order,item,'b','t',{h0:'diaf',l1:'1..*'});
+   c(item,prod,'r','l',{h1:'open',l1:'1'});
+   c(order,ship,'r','l',{dash:'dash',h1:'tri'});
+   c(cust,pay,'b','t',{h0:'dia',label:'pays with',l1:'0..*'});
+   c(cc,pay,'t','b',{h1:'tri'});c(pp,pay,'t','b',{h1:'tri'});
+   c(note,order,'b','t',{dash:'dash',width:1.2});
+   return {title:'UML class diagram',nodes,edges};
+ }}
+];
+/* =====================================================================
+   Geometry
+   ===================================================================== */
+function sidePoint(n,s){
+  let k=0;if(n.shape==='para')k=Math.min(22,n.w*.16)/2;
+  switch(s){case'l':return[n.x-n.w/2+k,n.y];case'r':return[n.x+n.w/2-k,n.y];case't':return[n.x,n.y-n.h/2];default:return[n.x,n.y+n.h/2];}
+}
+function derivedSide(a,b){
+  const dx=b.x-a.x,dy=b.y-a.y,rx=Math.abs(dx)/((a.w+b.w)/2+1),ry=Math.abs(dy)/((a.h+b.h)/2+1);
+  return rx>=ry?(dx>=0?'r':'l'):(dy>=0?'b':'t');
+}
+const ROUNDISH=new Set(['ellipse','point','circle','init','final']);
+function borderPoint(n,tx,ty){
+  const dx=tx-n.x,dy=ty-n.y;if(!dx&&!dy)return[n.x,n.y];
+  let s;const a=n.w/2,b=n.h/2;
+  if(ROUNDISH.has(n.shape))s=1/Math.hypot(dx/a,dy/b);
+  else if(n.shape==='diamond')s=1/(Math.abs(dx)/a+Math.abs(dy)/b);
+  else s=Math.min(a/Math.abs(dx||1e-9),b/Math.abs(dy||1e-9));
+  return[n.x+dx*s,n.y+dy*s];
+}
+const f2=p=>p[0].toFixed(1)+' '+p[1].toFixed(1);
+const ang=(p,q)=>Math.atan2(q[1]-p[1],q[0]-p[0]);
+function rounded(pts,r){
+  let d='M'+f2(pts[0]);
+  for(let i=1;i<pts.length-1;i++){
+    const p=pts[i],a=pts[i-1],b=pts[i+1],l1=Math.hypot(p[0]-a[0],p[1]-a[1]),l2=Math.hypot(b[0]-p[0],b[1]-p[1]),rr=Math.min(r,l1/2,l2/2);
+    if(rr<.5){d+='L'+f2(p);continue;}
+    d+='L'+f2([p[0]+(a[0]-p[0])/l1*rr,p[1]+(a[1]-p[1])/l1*rr])+'Q'+f2(p)+' '+f2([p[0]+(b[0]-p[0])/l2*rr,p[1]+(b[1]-p[1])/l2*rr]);
+  }
+  return d+'L'+f2(pts[pts.length-1]);
+}
+/* Orthogonal router. Works for every combination of sides (left/right/top/bottom),
+   so connectors flow correctly in horizontal AND vertical layouts. Returns the
+   points plus the index of the segment the bend handle moves. */
+function elbowRoute(p0,sa,p1,sb,bd){
+  const n0=SIDE_N[sa],n1=SIDE_N[sb],h0=n0[0]!==0,h1=n1[0]!==0,OFF=26;
+  let pts,mi=1;
+  if(h0&&h1){
+    if(n0[0]===n1[0]){const x=(n0[0]>0?Math.max(p0[0],p1[0])+OFF:Math.min(p0[0],p1[0])-OFF)+bd.x;pts=[p0,[x,p0[1]],[x,p1[1]],p1];}
+    else if((p1[0]-p0[0])*n0[0]>0){const mx=(p0[0]+p1[0])/2+bd.x;pts=[p0,[mx,p0[1]],[mx,p1[1]],p1];}
+    else{const s0=p0[0]+n0[0]*OFF,s1=p1[0]+n1[0]*OFF,my=(p0[1]+p1[1])/2+bd.y;pts=[p0,[s0,p0[1]],[s0,my],[s1,my],[s1,p1[1]],p1];mi=2;}
+  }else if(!h0&&!h1){
+    if(n0[1]===n1[1]){const y=(n0[1]>0?Math.max(p0[1],p1[1])+OFF:Math.min(p0[1],p1[1])-OFF)+bd.y;pts=[p0,[p0[0],y],[p1[0],y],p1];}
+    else if((p1[1]-p0[1])*n0[1]>0){const my=(p0[1]+p1[1])/2+bd.y;pts=[p0,[p0[0],my],[p1[0],my],p1];}
+    else{const s0=p0[1]+n0[1]*OFF,s1=p1[1]+n1[1]*OFF,mx=(p0[0]+p1[0])/2+bd.x;pts=[p0,[p0[0],s0],[mx,s0],[mx,s1],[p1[0],s1],p1];mi=2;}
+  }else{
+    const c=h0?[p1[0],p0[1]]:[p0[0],p1[1]];
+    const okA=(c[0]-p0[0])*n0[0]+(c[1]-p0[1])*n0[1]>0,okB=(c[0]-p1[0])*n1[0]+(c[1]-p1[1])*n1[1]>0;
+    const s0=[p0[0]+n0[0]*OFF,p0[1]+n0[1]*OFF],s1=[p1[0]+n1[0]*OFF,p1[1]+n1[1]*OFF];
+    if(okA&&okB){
+      pts=h0?[p0,[p1[0]+bd.x,p0[1]],[p1[0]+bd.x,s1[1]],s1,p1]:[p0,[p0[0],p1[1]+bd.y],[s1[0],p1[1]+bd.y],s1,p1];
+    }else{
+      pts=h0?[p0,[s0[0]+bd.x,p0[1]],[s0[0]+bd.x,s1[1]],s1,p1]:[p0,[p0[0],s0[1]+bd.y],[s1[0],s0[1]+bd.y],s1,p1];
+    }
+  }
+  const mid=[(pts[mi][0]+pts[mi+1][0])/2,(pts[mi][1]+pts[mi+1][1])/2];
+  // drop duplicate and collinear points
+  let q=[pts[0]];
+  for(let i=1;i<pts.length;i++){const p=pts[i],l=q[q.length-1];if(Math.hypot(p[0]-l[0],p[1]-l[1])>.01)q.push(p);}
+  for(let i=1;i<q.length-1;){const a=q[i-1],b=q[i],c2=q[i+1];
+    if((Math.abs(a[0]-b[0])<.01&&Math.abs(b[0]-c2[0])<.01)||(Math.abs(a[1]-b[1])<.01&&Math.abs(b[1]-c2[1])<.01))q.splice(i,1);else i++;}
+  if(q.length<2)q=[p0,p1];
+  return{pts:q,mid};
+}
+function geomRaw(e){
+  const a=N(e.from),b=N(e.to);if(!a||!b)return null;
+  const style=e.style||'curve',bd=e.bend||{x:0,y:0};
+  let sa=e.fa&&e.fa!=='auto'?e.fa:null,sb=e.ta&&e.ta!=='auto'?e.ta:null,p0,p1;
+  if(style==='straight'){
+    if(sa&&sb){p0=sidePoint(a,sa);p1=sidePoint(b,sb);}
+    else if(sa){p0=sidePoint(a,sa);p1=borderPoint(b,p0[0],p0[1]);}
+    else if(sb){p1=sidePoint(b,sb);p0=borderPoint(a,p1[0],p1[1]);}
+    else{p0=borderPoint(a,b.x,b.y);p1=borderPoint(b,a.x,a.y);}
+    const lm=[(p0[0]+p1[0])/2,(p0[1]+p1[1])/2];
+    if(Math.abs(bd.x)+Math.abs(bd.y)<1)return{d:'M'+f2(p0)+'L'+f2(p1),p0,p1,mid:lm,bs:1,kind:'poly',pts:[p0,p1],r:0};
+    const c=[lm[0]+2*bd.x,lm[1]+2*bd.y];
+    return{d:'M'+f2(p0)+'Q'+f2(c)+' '+f2(p1),p0,p1,mid:[lm[0]+bd.x,lm[1]+bd.y],bs:1,kind:'bez',P:[p0,c,p1]};
+  }
+  sa=sa||derivedSide(a,b);sb=sb||derivedSide(b,a);
+  p0=sidePoint(a,sa);p1=sidePoint(b,sb);
+  const n0=SIDE_N[sa],n1=SIDE_N[sb];
+  if(style==='elbow'){
+    const R=elbowRoute(p0,sa,p1,sb,bd),r=e.corner==='square'?0:12;
+    return{d:rounded(R.pts,r),p0,p1,mid:R.mid,bs:1,kind:'poly',pts:R.pts,r};
+  }
+  const dist=Math.hypot(p1[0]-p0[0],p1[1]-p0[1]),k=clamp(dist*.45,30,240);
+  const c1=[p0[0]+n0[0]*k+bd.x,p0[1]+n0[1]*k+bd.y],c2=[p1[0]+n1[0]*k+bd.x,p1[1]+n1[1]*k+bd.y];
+  const mid=[(p0[0]+3*c1[0]+3*c2[0]+p1[0])/8,(p0[1]+3*c1[1]+3*c2[1]+p1[1])/8];
+  return{d:'M'+f2(p0)+'C'+f2(c1)+' '+f2(c2)+' '+f2(p1),p0,p1,mid,bs:.75,kind:'bez',P:[p0,c1,c2,p1]};
+}
+/* label anchor = true midpoint along the drawn path (works for curved, straight and elbow lines) */
+function samplePts(g){if(g.kind==='poly')return g.pts;const o=[];for(let i=0;i<=32;i++)o.push(bzAt(g.P,i/32));return o;}
+function pathMid(g){
+  const p=samplePts(g);let tot=0;const seg=[];
+  for(let i=1;i<p.length;i++){const l=dst(p[i-1],p[i]);seg.push(l);tot+=l;}
+  let h=tot/2;
+  for(let i=0;i<seg.length;i++){if(h<=seg[i]&&seg[i]>0)return lerp(p[i],p[i+1],h/seg[i]);h-=seg[i];}
+  return g.mid;
+}
+function geom(e){const g=geomRaw(e);if(g)g.lm=pathMid(g);return g;}
+/* ---- trimming paths so arrowheads / UML markers sit exactly on the line ---- */
+const lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+const dst=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+function bzSplit(P,t){const L=[P[0]],R=[P[P.length-1]];let Q=P;while(Q.length>1){const nq=[];for(let i=0;i<Q.length-1;i++)nq.push(lerp(Q[i],Q[i+1],t));L.push(nq[0]);R.unshift(nq[nq.length-1]);Q=nq;}return[L,R];}
+const bzAt=(P,t)=>bzSplit(P,t)[0].slice(-1)[0];
+function bzParamAt(P,fromEnd,s){ // param whose point is chord-distance s from an end
+  const tip=fromEnd?P[P.length-1]:P[0];let lo=0,hi=1,t=.5;
+  if(fromEnd){for(let i=0;i<40;i++){t=(lo+hi)/2;dst(bzAt(P,t),tip)>s?lo=t:hi=t;}}
+  else{for(let i=0;i<40;i++){t=(lo+hi)/2;dst(bzAt(P,t),tip)>s?hi=t:lo=t;}}
+  return t;
+}
+function trimGeom(g,s0,s1){
+  if(!s0&&!s1)return{d:g.d};
+  if(g.kind==='bez'){
+    const P=g.P,total=dst(P[0],P[P.length-1])+1e-6;
+    let t0=0,t1=1;
+    if(s1)t1=bzParamAt(P,true,Math.min(s1,total*.45));
+    if(s0)t0=bzParamAt(P,false,Math.min(s0,total*.45));
+    if(t1<=t0+.02)return{d:g.d,b0:P[1],b1:P[P.length-2]};
+    let Q=bzSplit(P,t1)[0];Q=bzSplit(Q,t0/t1)[1];
+    const d='M'+f2(Q[0])+(Q.length===3?'Q'+f2(Q[1])+' '+f2(Q[2]):'C'+f2(Q[1])+' '+f2(Q[2])+' '+f2(Q[3]));
+    return{d,b0:Q[0],b1:Q[Q.length-1]};
+  }
+  const pts=g.pts.map(p=>[p[0],p[1]]),L=pts.length;let b0=null,b1=null;
+  if(s1){const a=pts[L-2],b=pts[L-1],l=dst(a,b),k=Math.min(s1,l*.9)/(l||1);b1=lerp(b,a,k);pts[L-1]=b1;}
+  if(s0){const a=pts[1],b=pts[0],l=dst(a,b),k=Math.min(s0,l*.9)/(l||1);b0=lerp(b,a,k);pts[0]=b0;}
+  return{d:g.r?rounded(pts,g.r):'M'+pts.map(f2).join('L'),b0,b1};
+}
+/* =====================================================================
+   Connector markers (arrow + UML)
+   ===================================================================== */
+const MARKERS=[['none','None'],['arrow','Arrow'],['open','Open arrow'],['tri','Hollow triangle'],['dia','Hollow diamond'],['diaf','Filled diamond'],['circ','Circle']];
+const MK_TRIM={arrow:.8,open:.12,tri:1.15,dia:1.6,diaf:1.6,circ:.7};
+function edgeHeads(e){
+  const a=e.arrow||'none';
+  return[e.h0!=null?e.h0:(a==='start'||a==='both'?'arrow':'none'),e.h1!=null?e.h1:(a==='end'||a==='both'?'arrow':'none')];
+}
+function markerSVG(type,tip,base,sz,col,w){
+  const a=ang(base,tip),c=Math.cos(a),s=Math.sin(a);
+  const P=(d,p)=>[tip[0]-c*d-s*p,tip[1]-s*d+c*p],poly=pts=>'M'+pts.map(f2).join('L')+'Z';
+  const sw=Math.max(1.2,w*.85);
+  switch(type){
+    case'arrow':return`<path d="${poly([P(0,0),P(sz,sz*.5),P(sz,-sz*.5)])}" fill="${col}" stroke="${col}" stroke-width="1" stroke-linejoin="round" pointer-events="none"/>`;
+    case'open':return`<path d="M${f2(P(sz,sz*.55))}L${f2(P(0,0))}L${f2(P(sz,-sz*.55))}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>`;
+    case'tri':return`<path d="${poly([P(0,0),P(sz*1.15,sz*.62),P(sz*1.15,-sz*.62)])}" fill="var(--node)" stroke="${col}" stroke-width="${sw}" stroke-linejoin="round" pointer-events="none"/>`;
+    case'dia':case'diaf':return`<path d="${poly([P(0,0),P(sz*.8,sz*.45),P(sz*1.6,0),P(sz*.8,-sz*.45)])}" fill="${type==='diaf'?col:'var(--node)'}" stroke="${col}" stroke-width="${sw}" stroke-linejoin="round" pointer-events="none"/>`;
+    case'circ':{const r=sz*.35,cc=P(r,0);return`<circle cx="${cc[0].toFixed(1)}" cy="${cc[1].toFixed(1)}" r="${r.toFixed(1)}" fill="var(--node)" stroke="${col}" stroke-width="${sw}" pointer-events="none"/>`;}
+  }
+  return'';
+}
+/* =====================================================================
+   Rendering
+   ===================================================================== */
+const FILLED=['pill','round','rect','ellipse','diamond','para','doc','cyl','note','package','component','node3d','circle','subproc','manual','prep','offpage','delay','store','class'];
+const isFilled=n=>!!n.fill&&FILLED.includes(n.shape);
+function textColorOf(n){
+  if(n.tc==='muted')return'var(--muted)';
+  if(n.tc)return n.tc;
+  return isFilled(n)?textOn(n.fill):'var(--ink)';
+}
+function shapeBody(n,P){
+  const hw=n.w/2,hh=n.h/2,fl=n.fill||'var(--node)',st=n.sk||(n.fill?'none':'var(--ink)'),dl=st==='none'?'rgba(0,0,0,.3)':st;
+  const S=d=>`<path class="sh" d="${d}" fill="${fl}" stroke="${st}" stroke-width="1.5" stroke-linejoin="round"/>`;
+  const Dl=d=>`<path d="${d}" fill="none" stroke="${dl}" stroke-width="1.5" stroke-linejoin="round"/>`;
+  const rectD=(x,y,w,h)=>`M${x} ${y}h${w}v${h}h${-w}Z`;
+  switch(n.shape){
+    case'diamond':return S(`M0 ${-hh}L${hw} 0L0 ${hh}L${-hw} 0Z`);
+    case'para':{const k=Math.min(22,n.w*.16);return S(`M${-hw+k} ${-hh}H${hw}L${hw-k} ${hh}H${-hw}Z`);}
+    case'doc':return S(`M${-hw} ${-hh}H${hw}V${hh-8}Q${hw/2} ${hh-22} 0 ${hh-8}T${-hw} ${hh-8}Z`);
+    case'cyl':{const ry=Math.min(11,n.h*.2);return S(`M${-hw} ${-hh+ry}A${hw} ${ry} 0 0 1 ${hw} ${-hh+ry}V${hh-ry}A${hw} ${ry} 0 0 1 ${-hw} ${hh-ry}Z`)+Dl(`M${-hw} ${-hh+ry}A${hw} ${ry} 0 0 0 ${hw} ${-hh+ry}`);}
+    case'note':{const f=Math.min(14,n.h*.3);return S(`M${-hw} ${-hh}H${hw-f}L${hw} ${-hh+f}V${hh}H${-hw}Z`)+Dl(`M${hw-f} ${-hh}V${-hh+f}H${hw}`);}
+    case'package':{const tw=Math.min(70,n.w*.42),th=14;return S(`M${-hw} ${-hh}H${-hw+tw}V${-hh+th}H${hw}V${hh}H${-hw}Z`)+Dl(`M${-hw} ${-hh+th}H${-hw+tw}`);}
+    case'component':return S(rectD(-hw+10,-hh,n.w-10,n.h))+S(rectD(-hw,-hh+n.h*.28-5,20,10))+S(rectD(-hw,hh-n.h*.28-5,20,10));
+    case'node3d':{const d=10;return S(`M${-hw} ${-hh+d}H${hw-d}V${hh}H${-hw}Z`)+S(`M${-hw} ${-hh+d}L${-hw+d} ${-hh}H${hw}L${hw-d} ${-hh+d}Z`)+S(`M${hw-d} ${-hh+d}L${hw} ${-hh}V${hh-d}L${hw-d} ${hh}Z`);}
+    case'circle':return`<ellipse class="sh" rx="${hw}" ry="${hh}" fill="${fl}" stroke="${st}" stroke-width="1.5"/>`;
+    case'subproc':return S(rectD(-hw,-hh,n.w,n.h))+Dl(`M${-hw+10} ${-hh}V${hh}M${hw-10} ${-hh}V${hh}`);
+    case'manual':return S(`M${-hw} ${-hh+12}L${hw} ${-hh}V${hh}H${-hw}Z`);
+    case'prep':{const k=Math.min(24,n.w*.18);return S(`M${-hw+k} ${-hh}H${hw-k}L${hw} 0L${hw-k} ${hh}H${-hw+k}L${-hw} 0Z`);}
+    case'offpage':return S(`M${-hw} ${-hh}H${hw}V${hh-14}L0 ${hh}L${-hw} ${hh-14}Z`);
+    case'delay':{const r=hh;return S(`M${-hw} ${-hh}H${hw-r}A${r} ${r} 0 0 1 ${hw-r} ${hh}H${-hw}Z`);}
+    case'store':return`<rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" fill="${fl}"/>`+Dl(`M${hw} ${-hh}H${-hw}V${hh}H${hw}M${-hw+16} ${-hh}V${hh}`);
+    case'class':{
+      const C=P.C,y1=-hh+P.topH,y2=y1+C.aH,s2=C.s2,col=textColorOf(n);
+      let o=S(rectD(-hw,-hh,n.w,n.h))+Dl(`M${-hw} ${y1}H${hw}M${-hw} ${y2}H${hw}`);
+      if(C.st)o+=`<text x="0" y="${P.stY.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${s2}" font-style="italic" fill="${col}">${esc(C.st)}</text>`;
+      C.at.forEach((t,i)=>{o+=`<text x="${-hw+10}" y="${(y1+6+C.lh2*(i+.5)).toFixed(1)}" dominant-baseline="central" font-size="${s2}" fill="${col}" xml:space="preserve" style="white-space:pre">${esc(t)}</text>`;});
+      C.op.forEach((t,i)=>{o+=`<text x="${-hw+10}" y="${(y2+6+C.lh2*(i+.5)).toFixed(1)}" dominant-baseline="central" font-size="${s2}" fill="${col}" xml:space="preserve" style="white-space:pre">${esc(t)}</text>`;});
+      return o;}
+    case'actor':{const c=n.fill||'var(--ink)',t=-hh;
+      return`<rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" fill="transparent"/><g fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="0" cy="${t+10}" r="9" fill="var(--node)"/><path d="M0 ${t+19}V${t+44}M-17 ${t+28}H17M0 ${t+44}L-14 ${t+64}M0 ${t+44}L14 ${t+64}"/></g>`;}
+    case'init':return`<circle r="16" fill="transparent"/><circle r="12" fill="${n.fill||'var(--ink)'}"/>`;
+    case'final':return`<circle r="15" fill="var(--node)" stroke="${n.fill||'var(--ink)'}" stroke-width="2"/><circle r="9" fill="${n.fill||'var(--ink)'}"/>`;
+    case'barh':case'barv':return`<rect x="${-hw-3}" y="${-hh-3}" width="${n.w+6}" height="${n.h+6}" fill="transparent"/><rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" rx="3" fill="${n.fill||'var(--ink)'}"/>`;
+    case'lane':{
+      const hs=hsOf(n),hc=n.fill||'#DCEAF5',bc=n.bf||'var(--node)',sk=n.sk||'var(--node-stroke)',l=n.hd==='l';
+      const hx=l?Math.min(hs,n.w):n.w,hy=l?n.h:Math.min(hs,n.h);
+      return`<rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" fill="${bc}" stroke="${sk}" stroke-width="1.2"/><rect class="hdr" x="${-hw}" y="${-hh}" width="${hx}" height="${hy}" fill="${hc}" stroke="${sk}" stroke-width="1.2"/>`;}
+    case'frame':{
+      const tw=Math.max(60,P.tw+28),hs=hsOf(n),sk=n.sk||'var(--ink)';
+      return`<rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" fill="${n.bf||'none'}" stroke="${sk}" stroke-width="1.5"/><path class="hdr" d="M${-hw} ${-hh}H${-hw+tw}V${-hh+hs-8}L${-hw+tw-8} ${-hh+hs}H${-hw}Z" fill="${n.fill||'var(--node)'}" stroke="${sk}" stroke-width="1.5"/>`;}
+  }
+  return'';
+}
+function nodeSVG(n,hideText,exp){
+  const hw=n.w/2,hh=n.h/2;let body='';const P=NOTEXT.has(n.shape)?null:place(n);
+  switch(n.shape){
+    case'pill':case'round':case'rect':{
+      const rx=n.shape==='pill'?(n.img?Math.min(hh,24):hh):n.shape==='round'?10:3;
+      body=`<rect class="sh" x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" rx="${rx}" fill="${n.fill||'var(--node)'}" stroke="${n.sk||(n.fill?'none':'var(--node-stroke)')}" stroke-width="1.5"/>`;break;}
+    case'ellipse':body=`<ellipse class="sh" rx="${hw}" ry="${hh}" fill="${n.fill||'var(--node)'}" stroke="${n.sk||(n.fill?'none':'var(--node-stroke)')}" stroke-width="1.5"/>`;break;
+    case'outline':body=`<rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" rx="6" fill="var(--node)" stroke="${n.fill||'var(--node-stroke)'}" stroke-width="1.3"/>`;break;
+    case'underline':body=`<rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" fill="transparent"/><line x1="${-hw}" y1="${hh-1}" x2="${hw}" y2="${hh-1}" stroke="${n.fill||'var(--line)'}" stroke-width="2" stroke-linecap="round"/>`;break;
+    case'text':body=`<rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" fill="transparent"/>`;break;
+    case'point':body=`<circle r="10" fill="transparent"/><circle r="4" fill="${n.fill||'var(--ink)'}"/>`;break;
+    case'card':{
+      const acc=n.fill||'var(--node-stroke)',dy=P.tt?-hh+12+P.hdH/2:-hh+10;
+      body=`<rect x="${-hw+16}" y="${hh-6}" width="${n.w-32}" height="14" rx="6" fill="${acc}" stroke="var(--ink)" stroke-width="2"/>`
+        +`<rect x="${-hw}" y="${-hh}" width="${n.w}" height="${n.h}" rx="16" fill="var(--node)" stroke="var(--ink)" stroke-width="2.2"/>`
+        +`<rect x="${-hw+10}" y="${dy}" width="${n.w-20}" height="${hh-10-dy}" rx="11" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="6 4"/>`;
+      if(P.tt){
+        const tcol=/^#[0-9a-f]{6}$/i.test(n.fill||'')?textOn(n.fill):'var(--ink)';
+        body+=`<rect x="${-hw+10}" y="${-hh+12}" width="${n.w-20}" height="${P.hdH}" rx="11" fill="${acc}" stroke="var(--ink)" stroke-width="2"/>`
+          +`<text x="0" y="${-hh+12+P.hdH/2}" text-anchor="middle" dominant-baseline="central" font-size="${P.ts}" font-weight="700" fill="${tcol}">${esc(P.tt)}</text>`;
+      }
+      break;}
+    default:body=shapeBody(n,P);
+  }
+  let txt='';
+  if(P){
+    const col=textColorOf(n),off=n.shape==='underline'?-1:0;
+    if(isCont(n)){
+      if(!hideText){
+        const t=P.lines.map((l,i)=>`<text x="${P.tx.toFixed(1)}" y="${(P.rc+(i-(P.lines.length-1)/2)*P.lh).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${n.size}" font-weight="${n.bold?600:400}" fill="${col}">${esc(l)}</text>`).join('');
+        txt=P.rot?`<g transform="rotate(-90 ${P.tx.toFixed(1)} ${P.rc.toFixed(1)})">${t}</g>`:t;
+      }
+    }else{
+      if(n.img){
+        const cid='ci-'+n.id;
+        txt+=`<clipPath id="${cid}"><rect x="${P.imgX}" y="${P.imgY}" width="${P.iw}" height="${P.ih}" rx="8"/></clipPath>`
+          +`<image href="${esc(n.img)}" x="${P.imgX}" y="${P.imgY}" width="${P.iw}" height="${P.ih}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${cid})"/>`;
+      }
+      if(P.ic){
+        const icol=n.ic||(isFilled(n)||n.shape==='card'||!n.fill?col:n.fill);
+        txt+=nIcoSVG(n.icon,P.icX,P.rc-P.ic/2+off,P.ic,icol,2);
+      }
+      const lft=n.al==='left'&&P.lines.length>1,tx=lft?P.tx-P.tw/2:P.tx;
+      if(!hideText&&hasRich(n))txt+=richSVG(n,P,col,off,lft);
+      else if(!hideText)txt+=P.lines.map((l,i)=>`<text x="${tx.toFixed(1)}" y="${(P.rc+(i-(P.lines.length-1)/2)*P.lh+off).toFixed(1)}" text-anchor="${lft?'start':'middle'}" dominant-baseline="central" font-size="${n.size}" font-weight="${n.bold?600:400}"${n.ul?' text-decoration="underline"':''}${n.stereo==='abstract'&&n.shape==='class'?' font-style="italic"':''} fill="${col}">${esc(l)}</text>`).join('');
+      if(P.lk){
+        const ly=P.rc-P.lk/2+off,u=esc(safeUrl(n.link)||n.link);
+        txt+=`<g class="lnk" data-link="${u}"><title>${u}</title><rect class="lnkbg" x="${P.lkX-3}" y="${ly-3}" width="${P.lk+6}" height="${P.lk+6}" rx="5" fill="transparent"/>${nIcoSVG('link',P.lkX,ly,P.lk,isFilled(n)?col:'var(--accent)',2.2)}</g>`;
+      }
+    }
+  }
+  const g=`<g class="node${isCont(n)?' cont':''}" data-id="${n.id}" transform="translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})">${body}${txt}</g>`;
+  const url=exp&&n.link?safeUrl(n.link):'';
+  return url?`<a href="${esc(url)}" xlink:href="${esc(url)}" target="_blank" rel="noopener">${g}</a>`:g;
+}
+/* end-of-line labels (UML multiplicities) */
+function endLabelPos(g,which,trim){
+  const tip=which?g.p1:g.p0;let nb;
+  if(g.kind==='poly'){const p=g.pts;nb=which?p[p.length-2]:p[1];}else{const P=g.P;nb=which?P[P.length-2]:P[1];if(dst(nb,tip)<1)nb=which?P[0]:P[P.length-1];}
+  const l=dst(nb,tip)||1,u=[(nb[0]-tip[0])/l,(nb[1]-tip[1])/l],v=[-u[1],u[0]],d=trim+12;
+  return[tip[0]+u[0]*d+v[0]*12,tip[1]+u[1]*d+v[1]*12];
+}
+function edgeSVG(e,o){
+  o=o||{};const g=geom(e);if(!g)return'';
+  const col=colorOf(e.color),w=e.width||2,k=o.k||1;
+  const dash=e.dash==='dash'?`${w*4} ${w*3}`:e.dash==='dot'?`0.1 ${w*3}`:'';
+  let s=`<g class="edge" data-id="${e.id}">`;
+  if(!o.exp)s+=`<path class="hit" d="${g.d}" fill="none" stroke="transparent" stroke-width="${Math.max(14/k,w+8)}"/>`;
+  if(o.sel)s+=`<path d="${g.d}" fill="none" stroke="var(--accent)" stroke-opacity=".3" stroke-width="${w+7}" stroke-linecap="round" pointer-events="none"/>`;
+  const [m0,m1]=edgeHeads(e),sz=Math.max(10,w*2.6+5);
+  const t0=m0!=='none'&&MK_TRIM[m0]?MK_TRIM[m0]*sz:0,t1=m1!=='none'&&MK_TRIM[m1]?MK_TRIM[m1]*sz:0;
+  const tg=trimGeom(g,t0,t1);
+  s+=`<path d="${tg.d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"${dash?` stroke-dasharray="${dash}"`:''} pointer-events="none"/>`;
+  if(t1&&tg.b1)s+=markerSVG(m1,g.p1,tg.b1,sz,col,w);
+  if(t0&&tg.b0)s+=markerSVG(m0,g.p0,tg.b0,sz,col,w);
+  const lc=e.color&&e.color!=='ink'?col:'var(--ink)';
+  [[e.l0,0,t0],[e.l1,1,t1]].forEach(([t,wh,tr])=>{if(!t)return;const p=endLabelPos(g,wh,tr);
+    s+=`<text x="${p[0].toFixed(1)}" y="${p[1].toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="11" fill="${lc}" stroke="var(--canvas)" stroke-width="3" paint-order="stroke">${esc(t)}</text>`;});
+  if(e.label&&!o.hideLabel){
+    const fs=12,lw=textWidth(e.label,fs,true)+12,lp=g.lm;
+    s+=`<rect x="${(lp[0]-lw/2).toFixed(1)}" y="${(lp[1]-10).toFixed(1)}" width="${lw.toFixed(1)}" height="20" rx="5" fill="var(--canvas)" pointer-events="none"/>`
+      +`<text x="${lp[0].toFixed(1)}" y="${lp[1].toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="600" fill="${lc}">${esc(e.label)}</text>`;
+  }
+  return s+'</g>';
+}
+function overlaySVG(){
+  const k=doc.view.k,s=1/k,coarse=matchMedia('(pointer:coarse)').matches,hr=(coarse?15:11)*s;let o='';
+  for(const id of ui.sel){
+    const n=N(id);if(!n)continue;const p=4*s;
+    o+=`<rect x="${n.x-n.w/2-p}" y="${n.y-n.h/2-p}" width="${n.w+p*2}" height="${n.h+p*2}" rx="${9*s}" fill="none" stroke="var(--accent)" stroke-width="${2*s}" pointer-events="none"/>`;
+  }
+  if(ui.connectFrom){const n=N(ui.connectFrom);if(n)o+=`<rect x="${n.x-n.w/2-6*s}" y="${n.y-n.h/2-6*s}" width="${n.w+12*s}" height="${n.h+12*s}" rx="${10*s}" fill="none" stroke="var(--accent)" stroke-width="${2*s}" stroke-dasharray="${6*s} ${4*s}" pointer-events="none"/>`;}
+  if(ui.hover){const n=N(ui.hover);if(n)o+=`<rect x="${n.x-n.w/2-6*s}" y="${n.y-n.h/2-6*s}" width="${n.w+12*s}" height="${n.h+12*s}" rx="${10*s}" fill="var(--accent)" fill-opacity=".15" stroke="var(--accent)" stroke-width="${2*s}" pointer-events="none"/>`;}
+  if(ui.sel.size===1&&!ui.editing&&!ui.dragging&&ui.mode!=='connect'){
+    const n=N([...ui.sel][0]);
+    if(n&&!isCont(n))for(const d of['t','r','b','l']){
+      const[px,py]=sidePoint(n,d),[nx,ny]=SIDE_N[d],off=(n.shape==='point'?10:4)*s+hr+5*s,cx=px+nx*off,cy=py+ny*off,u=hr*.5;
+      o+=`<g class="hnd" data-h="add" data-dir="${d}" data-id="${n.id}"><circle cx="${cx}" cy="${cy}" r="${hr}" fill="var(--accent)" stroke="#fff" stroke-width="${1.5*s}"/><path d="M${cx-u} ${cy}H${cx+u}M${cx} ${cy-u}V${cy+u}" stroke="var(--accent-ink)" stroke-width="${2*s}" stroke-linecap="round"/></g>`;
+    }
+    if(n&&!FIXED[n.shape]){
+      const x=n.x+n.w/2+4*s,y=n.y+n.h/2+4*s,r=(coarse?9:6)*s;
+      o+=`<g class="hnd rs" data-h="resize" data-id="${n.id}"><rect x="${x-r*2}" y="${y-r*2}" width="${r*4}" height="${r*4}" fill="transparent"/><rect x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="${2*s}" fill="#fff" stroke="var(--accent)" stroke-width="${2*s}"/></g>`;
+    }
+  }
+  if(ui.edge){
+    const e=E(ui.edge),g=e&&geom(e);
+    if(g){
+      const dot=(x,y,kind,fill)=>`<g class="hnd" data-h="${kind}" data-id="${e.id}"><circle cx="${x}" cy="${y}" r="${(coarse?20:14)*s}" fill="transparent"/><circle cx="${x}" cy="${y}" r="${7*s}" fill="${fill}" stroke="var(--accent)" stroke-width="${2.5*s}"/></g>`;
+      o+=dot(g.p0[0],g.p0[1],'end0','#fff')+dot(g.p1[0],g.p1[1],'end1','#fff')+dot(g.mid[0],g.mid[1],'bend','var(--accent)');
+    }
+  }
+  if(ui.preview){const p=ui.preview;o+=`<line x1="${p.x1}" y1="${p.y1}" x2="${p.x2}" y2="${p.y2}" stroke="var(--accent)" stroke-width="${2.5*s}" stroke-dasharray="${7*s} ${5*s}" stroke-linecap="round" pointer-events="none"/><circle cx="${p.x2}" cy="${p.y2}" r="${5*s}" fill="var(--accent)" pointer-events="none"/>`;}
+  if(ui.marquee){const m=ui.marquee;o+=`<rect x="${m.x}" y="${m.y}" width="${m.w}" height="${m.h}" fill="var(--accent)" fill-opacity=".12" stroke="var(--accent)" stroke-width="${s}" stroke-dasharray="${5*s} ${4*s}" pointer-events="none"/>`;}
+  return o;
+}
+let rq=0;
+function schedule(){if(!rq)rq=requestAnimationFrame(()=>{rq=0;render();});}
+function render(){
+  const v=doc.view,k=v.k;
+  world.setAttribute('transform',`translate(${v.x.toFixed(1)} ${v.y.toFixed(1)}) scale(${k})`);
+  lanesL.innerHTML=doc.nodes.filter(isCont).map(n=>nodeSVG(n,ui.editing===n.id)).join('');
+  edgesL.innerHTML=doc.edges.map(e=>edgeSVG(e,{k,sel:e.id===ui.edge,hideLabel:ed&&ed.kind==='edge'&&ed.id===e.id})).join('');
+  nodesL.innerHTML=doc.nodes.filter(n=>!isCont(n)).map(n=>nodeSVG(n,ui.editing===n.id)).join('');
+  overlayL.innerHTML=overlaySVG();
+  canvas.style.backgroundSize=`${24*k}px ${24*k}px`;
+  canvas.style.backgroundPosition=`${v.x}px ${v.y}px`;
+  canvas.classList.toggle('nogrid',!ui.grid);
+  $('#zl').textContent=Math.round(k*100)+'%';
+}
+function refresh(){render();renderInspector();syncBar();}
+function syncBar(){
+  $('#bUndo').disabled=hist.i<=0;$('#bRedo').disabled=hist.i>=hist.stack.length-1;
+  $('#bConnect').classList.toggle('on',ui.mode==='connect');
+  $('#bUml').classList.toggle('on',ui.uml);
+  $('#bGrid').classList.toggle('on',ui.grid);$('#bSnap').classList.toggle('on',ui.snap);
+  $('#bSide').classList.toggle('on',ui.side);
+  $('#themeLbl').textContent=ui.theme[0].toUpperCase()+ui.theme.slice(1);
+  insp.classList.toggle('open',ui.side);
+  insp.style.display=ui.side||matchMedia('(max-width:900px)').matches?'':'none';
+  lib.classList.toggle('show',ui.uml);
+}
+/* =====================================================================
+   History + persistence
+   ===================================================================== */
+const hist={stack:[],i:-1};
+const snapshot=()=>JSON.stringify({title:doc.title,nodes:doc.nodes,edges:doc.edges});
+function commit(){
+  const s=snapshot();if(hist.stack[hist.i]===s)return;
+  hist.stack=hist.stack.slice(0,hist.i+1);hist.stack.push(s);
+  if(hist.stack.length>150)hist.stack.shift();
+  hist.i=hist.stack.length-1;saveSoon();syncBar();
+}
+function restore(s){
+  const o=JSON.parse(s);doc.title=o.title;doc.nodes=o.nodes;doc.edges=o.edges;
+  ui.sel=new Set([...ui.sel].filter(id=>N(id)));
+  if(ui.edge&&!E(ui.edge))ui.edge=null;
+  $('#title').value=doc.title;refresh();saveSoon();
+}
+const undo=()=>{if(ed)cancelEdit();if(hist.i>0){hist.i--;restore(hist.stack[hist.i]);}};
+const redo=()=>{if(hist.i<hist.stack.length-1){hist.i++;restore(hist.stack[hist.i]);}};
+let st=0;
+let quotaWarned=false;
+function saveSoon(){clearTimeout(st);st=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(doc));quotaWarned=false;}catch(_){if(!quotaWarned){quotaWarned=true;toast('Map too large to auto-save (images) — use File › Save as JSON');}}},300);}
+function loadData(o,keepView){
+  const eDef={fa:'auto',ta:'auto',style:'curve',color:null,width:2,dash:'',arrow:'none',label:'',bend:{x:0,y:0}};
+  const ns=(o.nodes||[]).map(n=>fit(Object.assign({id:uid(),text:'',x:0,y:0},DEF,n)));
+  const ids=new Set(ns.map(n=>n.id));
+  const es=(o.edges||[]).map(e=>Object.assign({id:uid()},eDef,e)).filter(e=>ids.has(e.from)&&ids.has(e.to));
+  doc.nodes=ns;doc.edges=es;doc.title=o.title||'Untitled mind map';
+  if(keepView&&o.view)doc.view=o.view;
+  ui.sel=new Set();ui.edge=null;ui.connectFrom=null;
+  hist.stack=[];hist.i=-1;$('#title').value=doc.title;
+  commit();refresh();if(!keepView)fitView();
+}
+/* =====================================================================
+   View helpers
+   ===================================================================== */
+function bounds(ns){
+  if(!ns.length)return{x:-100,y:-60,w:200,h:120};
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  ns.forEach(n=>{x0=Math.min(x0,n.x-n.w/2);x1=Math.max(x1,n.x+n.w/2);y0=Math.min(y0,n.y-n.h/2);y1=Math.max(y1,n.y+n.h/2+(n.shape==='card'?9:0));});
+  return{x:x0,y:y0,w:Math.max(x1-x0,1),h:Math.max(y1-y0,1)};
+}
+function fitView(){
+  const W=canvas.clientWidth,H=canvas.clientHeight,b=bounds(doc.nodes),pad=56;
+  const k=clamp(Math.min((W-pad*2)/b.w,(H-pad*2)/b.h),.12,1.6);
+  doc.view={k,x:W/2-(b.x+b.w/2)*k,y:H/2-(b.y+b.h/2)*k};render();saveSoon();
+}
+function zoomAt(cx,cy,f){
+  const r=svg.getBoundingClientRect(),v=doc.view,nk=clamp(v.k*f,.1,3),px=cx-r.left,py=cy-r.top;
+  v.x=px-(px-v.x)*(nk/v.k);v.y=py-(py-v.y)*(nk/v.k);v.k=nk;render();saveSoon();
+}
+function zoomCenter(f){const r=svg.getBoundingClientRect();zoomAt(r.left+r.width/2,r.top+r.height/2,f);}
+function wpt(ev){const r=svg.getBoundingClientRect(),v=doc.view;return[(ev.clientX-r.left-v.x)/v.k,(ev.clientY-r.top-v.y)/v.k];}
+function viewCenter(){const r=svg.getBoundingClientRect(),v=doc.view;return[(r.width/2-v.x)/v.k,(r.height/2-v.y)/v.k];}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2200);}
+const inBox=(n,x,y,p)=>x>=n.x-n.w/2-p&&x<=n.x+n.w/2+p&&y>=n.y-n.h/2-p&&y<=n.y+n.h/2+p;
+/* shapes first; containers (swimlanes/frames) only if noCont is false */
+function nodeAt(x,y,exclude,noCont){
+  for(let i=doc.nodes.length-1;i>=0;i--){
+    const n=doc.nodes[i];if(n.id===exclude||isCont(n))continue;
+    if(inBox(n,x,y,n.shape==='point'?10:6))return n;
+  }
+  if(!noCont)for(let i=doc.nodes.length-1;i>=0;i--){const n=doc.nodes[i];if(n.id!==exclude&&isCont(n)&&inBox(n,x,y,0))return n;}
+  return null;
+}
+function inHeader(n,x,y){
+  const l=n.x-n.w/2,t=n.y-n.h/2,hs=hsOf(n);
+  if(n.shape==='frame'){const tw=Math.max(60,layout(n).tw+28);return(x<=l+tw&&y<=t+hs)||Math.abs(x-l)<6||Math.abs(x-l-n.w)<6||Math.abs(y-t)<6||Math.abs(y-t-n.h)<6;}
+  return n.hd==='l'?x<=l+hs:y<=t+hs;
+}
+const contains=(c,n)=>n.id!==c.id&&!isCont(n)&&n.x>=c.x-c.w/2&&n.x<=c.x+c.w/2&&n.y>=c.y-c.h/2&&n.y<=c.y+c.h/2;
+function sideAt(t,x,y){
+  const rx=(x-t.x)/(t.w/2),ry=(y-t.y)/(t.h/2);
+  if(Math.hypot(rx,ry)<.35||t.shape==='point')return'auto';
+  return Math.abs(rx)>=Math.abs(ry)?(rx>0?'r':'l'):(ry>0?'b':'t');
+}
+/* =====================================================================
+   Graph operations
+   ===================================================================== */
+function overlaps(x,y,n){return doc.nodes.some(m=>m.id!==n.id&&!isCont(m)&&Math.abs(x-m.x)<(n.w+m.w)/2+8&&Math.abs(y-m.y)<(n.h+m.h)/2+8);}
+function refEdge(src){return doc.edges.find(e=>e.to===src.id)||doc.edges.find(e=>e.from===src.id);}
+function edgeProps(src){
+  const r=refEdge(src);
+  const o={style:r?r.style:'curve',width:r?r.width:2,dash:r?r.dash:'',arrow:r?r.arrow:'none',color:src.fill||(r?r.color:null)};
+  if(r){if(r.corner)o.corner=r.corner;if(r.h0!=null)o.h0=r.h0;if(r.h1!=null)o.h1=r.h1;if(r.color)o.color=r.color;}
+  return Object.assign(o,defEdge()||{});
+}
+function newChildOf(src){
+  const root=!doc.edges.some(e=>e.to===src.id);
+  const shape=NOTEXT.has(src.shape)||isCont(src)?'round':(root&&src.shape==='ellipse'?'pill':src.shape);
+  return mk('New idea',0,0,{shape,fill:src.fill,tc:src.tc==='muted'?'muted':src.tc,size:root?16:Math.max(12,src.size-1),bold:false,sk:src.sk});
+}
+function addNodeDir(src,dir){
+  if(isCont(src))return;
+  if(addInherited(src,dir))return;
+  const n=newChildOf(src),horiz=dir==='l'||dir==='r',gap=horiz?100:70;
+  const half=horiz?src.w/2+n.w/2:src.h/2+n.h/2,[nx,ny]=SIDE_N[dir];
+  let x=src.x+nx*(half+gap),y=src.y+ny*(half+gap);
+  for(let i=0;i<40;i++){
+    const sft=i===0?0:(i%2?1:-1)*Math.ceil(i/2)*((horiz?n.h:n.w)+16),px=x+(horiz?0:sft),py=y+(horiz?sft:0);
+    if(!overlaps(px,py,n)){x=px;y=py;break;}
+  }
+  n.x=x;n.y=y;doc.nodes.push(n);
+  doc.edges.push(ln(src,n,Object.assign(edgeProps(src),{fa:dir,ta:OPP[dir]})));
+  ui.sel=new Set([n.id]);ui.edge=null;commit();refresh();startEdit(n.id);
+}
+function addNodeAt(src,x,y,dir){
+  const m=modelFor(src),n=m?styledChild(m.n):newChildOf(src);n.x=x;n.y=y;doc.nodes.push(n);
+  doc.edges.push(m?styledEdge(src,n,m.e,{fa:dir,ta:(m.e.fa===dir?m.e.ta:'auto')||'auto'}):ln(src,n,Object.assign(edgeProps(src),{fa:dir,ta:'auto'})));
+  ui.sel=new Set([n.id]);ui.edge=null;commit();refresh();startEdit(n.id);
+}
+function addChildAuto(src){
+  if(isCont(src)){toast('Drop shapes into the lane, or double-click inside it to add one');return;}
+  if(addInherited(src,null))return;
+  const pe=doc.edges.find(e=>e.to===src.id),p=pe&&N(pe.from);let dir='r';
+  if(p){const dx=src.x-p.x,dy=src.y-p.y;dir=Math.abs(dx)>=Math.abs(dy)?(dx>=0?'r':'l'):(dy>=0?'b':'t');}
+  addNodeDir(src,dir);
+}
+/* ---------- style inheritance for new nodes ----------
+   A new child copies an existing "model" child: first the parent's own latest
+   child, else a child of a similar node (sibling/same-style node). It inherits
+   node look (shape, fill, text colour, size, bold, alignment, card width) and
+   connector look (style, corners, colour, width, dash, arrow, attach sides),
+   and is placed following the siblings' spacing pattern. */
+const kidsOf=id=>doc.edges.filter(e=>e.from===id).map(e=>({e,n:N(e.to)})).filter(k=>k.n);
+const parentEdge=id=>doc.edges.find(e=>e.to===id);
+const sameLook=(a,b)=>a.shape===b.shape&&(a.fill||'')===(b.fill||'')&&a.size===b.size;
+function modelFor(src){
+  const own=kidsOf(src.id);
+  if(own.length)return{...own[own.length-1],own:true,list:own};
+  const pe=parentEdge(src.id);
+  if(pe){ // siblings of src that already have children (e.g. other branches in a template)
+    for(const s of kidsOf(pe.from)){if(s.n.id===src.id)continue;const k=kidsOf(s.n.id);if(k.length)return{...k[0],own:false,peer:s.n};}
+  }
+  for(const m of doc.nodes){ // any node that looks like src and has children
+    if(m.id===src.id||!sameLook(m,src))continue;const k=kidsOf(m.id).filter(x=>x.n.id!==src.id);
+    if(k.length)return{...k[0],own:false,peer:m};
+  }
+  return null;
+}
+const NODE_STYLE=['shape','fill','tc','size','bold','al','mw','mh','ic','sk','ul','stereo'];
+const EDGE_STYLE=['style','corner','color','width','dash','arrow','h0','h1'];
+function styledChild(tpl,text){
+  const o={};NODE_STYLE.forEach(k=>{if(tpl[k]!=null)o[k]=tpl[k];});
+  if(tpl.shape==='card'&&tpl.title)o.title='New title';
+  if(tpl.shape==='class'){o.attrs='';o.ops='';}
+  if(tpl.icon)o.icon=tpl.icon;
+  return mk(text||'New idea',0,0,o);
+}
+function styledEdge(src,n,tplEdge,extra){
+  const o={};EDGE_STYLE.forEach(k=>{if(tplEdge[k]!==undefined)o[k]=tplEdge[k];});
+  o.fa=tplEdge.fa||'auto';o.ta=tplEdge.ta||'auto';
+  return ln(src,n,Object.assign(o,extra||{}));
+}
+const box=n=>({l:n.x-n.w/2,r:n.x+n.w/2,t:n.y-n.h/2,b:n.y+n.h/2});
+/* place n after `last` in a run of siblings (prev = the one before it, may be null) */
+function placeAfter(src,n,last,prev,ta){
+  const L=box(last);let vert,sign=1,gap;
+  if(prev){
+    const P=box(prev),dx=last.x-prev.x,dy=last.y-prev.y;vert=Math.abs(dy)>=Math.abs(dx);
+    sign=(vert?dy:dx)>=0?1:-1;
+    gap=vert?(sign>0?L.t-P.b:P.t-L.b):(sign>0?L.l-P.r:P.l-L.r);gap=clamp(gap,6,400);
+  }else{
+    if(ta==='l'||ta==='r')vert=true;else if(ta==='t'||ta==='b')vert=false;
+    else vert=Math.abs(last.x-src.x)>=Math.abs(last.y-src.y);
+    sign=vert?1:(last.x>=src.x?1:-1);gap=vert?16:30;
+  }
+  if(vert){
+    n.y=sign>0?L.b+gap+n.h/2:L.t-gap-n.h/2;
+    n.x=ta==='l'?L.l+n.w/2:ta==='r'?L.r-n.w/2:last.x;
+  }else{
+    n.x=sign>0?L.r+gap+n.w/2:L.l-gap-n.w/2;
+    n.y=ta==='t'?L.t+n.h/2:ta==='b'?L.b-n.h/2:last.y;
+  }
+  for(let i=0;i<60&&overlaps(n.x,n.y,n);i++){if(vert)n.y+=sign*(n.h/2+gap/2);else n.x+=sign*(n.w/2+gap/2);}
+}
+/* place like model child `c` sits relative to its parent `p` */
+function placeLike(src,n,c,p,ta){
+  n.y=src.y+(c.y-p.y);
+  if(ta==='l')n.x=src.x+(box(c).l-p.x)+n.w/2;else if(ta==='r')n.x=src.x+(box(c).r-p.x)-n.w/2;else n.x=src.x+(c.x-p.x);
+  const vert=Math.abs(c.y-p.y)>=Math.abs(c.x-p.x);
+  for(let i=0;i<60&&overlaps(n.x,n.y,n);i++){if(vert)n.x+=(c.x>=p.x?1:-1)*(n.w/2+12);else n.y+=n.h/2+12;}
+}
+function finishAdd(n,e){doc.nodes.push(n);doc.edges.push(e);ui.sel=new Set([n.id]);ui.edge=null;commit();refresh();startEdit(n.id);}
+/* returns true if it handled the add */
+function addInherited(src,dir){
+  const m=modelFor(src);if(!m)return false;
+  const efa=m.e.fa&&m.e.fa!=='auto'?m.e.fa:derivedSide(m.own?src:(m.peer||src),m.n);
+  if(dir&&dir!==efa){ // explicit different direction: keep look, use requested side
+    const n=styledChild(m.n),horiz=dir==='l'||dir==='r',gap=horiz?100:70,[nx,ny]=SIDE_N[dir];
+    const half=horiz?src.w/2+n.w/2:src.h/2+n.h/2;n.x=src.x+nx*(half+gap);n.y=src.y+ny*(half+gap);
+    for(let i=0;i<40&&overlaps(n.x,n.y,n);i++){const s=(i%2?1:-1)*Math.ceil(i/2)*((horiz?n.h:n.w)+16);if(horiz)n.y+=s;else n.x+=s;}
+    finishAdd(n,styledEdge(src,n,m.e,{fa:dir,ta:OPP[dir],bend:{x:0,y:0},label:''}));return true;
+  }
+  const n=styledChild(m.n),ta=m.e.ta;
+  if(m.own){
+    const run=m.list.filter(k=>(k.e.fa||'auto')===(m.e.fa||'auto')).map(k=>k.n);
+    placeAfter(src,n,run[run.length-1],run.length>1?run[run.length-2]:null,ta);
+  }else placeLike(src,n,m.n,m.peer,ta);
+  const bend=m.e.bend&&m.e.style==='elbow'?{...m.e.bend}:{x:0,y:0};
+  finishAdd(n,styledEdge(src,n,m.e,{bend}));return true;
+}
+function addSibling(node){
+  const pe=parentEdge(node.id);if(!pe){toast('This node has no parent — use Tab to add a child');return;}
+  const src=N(pe.from),n=styledChild(node);
+  const run=kidsOf(src.id).filter(k=>(k.e.fa||'auto')===(pe.fa||'auto')).map(k=>k.n),i=run.findIndex(x=>x.id===node.id);
+  placeAfter(src,n,node,i>0?run[i-1]:null,pe.ta);
+  const bend=pe.bend&&pe.style==='elbow'?{...pe.bend}:{x:0,y:0};
+  const e=styledEdge(src,n,pe,{bend});
+  doc.nodes.push(n);const at=doc.edges.indexOf(pe);doc.edges.splice(at+1,0,e); // keep sibling order
+  ui.sel=new Set([n.id]);ui.edge=null;commit();refresh();startEdit(n.id);
+}
+function addFreeNode(x,y){
+  const n=mk('New idea',x,y,ui.uml?{shape:'rect',sk:'var(--ink)'}:{});doc.nodes.push(n);ui.sel=new Set([n.id]);ui.edge=null;commit();refresh();startEdit(n.id);
+}
+function addEdge(a,b,o){
+  if(a===b)return;
+  if(doc.edges.some(e=>(e.from===a&&e.to===b)||(e.from===b&&e.to===a))){toast('Those nodes are already connected');return;}
+  const src=N(a),e=ln(src,N(b),Object.assign(edgeProps(src),o||{}));
+  doc.edges.push(e);ui.edge=e.id;ui.sel=new Set();commit();refresh();
+  if(ui.labelNext&&ui.ctype)startEditEdge(e.id);
+}
+function descendants(id){
+  const out=new Set(),q=[id];
+  while(q.length){const c=q.pop();doc.edges.forEach(e=>{if(e.from===c&&!out.has(e.to)&&e.to!==id){out.add(e.to);q.push(e.to);}});}
+  return out;
+}
+function selectBranch(){const s=new Set(ui.sel);[...ui.sel].forEach(i=>descendants(i).forEach(d=>s.add(d)));ui.sel=s;refresh();}
+function deleteSel(){
+  if(ui.edge){doc.edges=doc.edges.filter(e=>e.id!==ui.edge);ui.edge=null;}
+  else if(ui.sel.size){doc.nodes=doc.nodes.filter(n=>!ui.sel.has(n.id));doc.edges=doc.edges.filter(e=>!ui.sel.has(e.from)&&!ui.sel.has(e.to));ui.sel=new Set();}
+  else return;
+  commit();refresh();
+}
+function copySel(){
+  if(!ui.sel.size)return;
+  clip={nodes:doc.nodes.filter(n=>ui.sel.has(n.id)).map(n=>({...n})),edges:doc.edges.filter(e=>ui.sel.has(e.from)&&ui.sel.has(e.to)).map(e=>({...e,bend:{...e.bend}}))};
+  toast('Copied');
+}
+function paste(off){
+  if(!clip)return;off=off||36;const map=new Map();
+  const ns=clip.nodes.map(n=>{const c={...n,id:uid(),x:n.x+off,y:n.y+off};map.set(n.id,c.id);return c;});
+  const es=clip.edges.map(e=>({...e,id:uid(),from:map.get(e.from),to:map.get(e.to),bend:{...e.bend}}));
+  doc.nodes.push(...ns);doc.edges.push(...es);ui.sel=new Set(ns.map(n=>n.id));ui.edge=null;
+  clip.nodes=clip.nodes.map(n=>({...n,x:n.x+off,y:n.y+off}));commit();refresh();
+}
+const duplicate=()=>{copySel();paste();};
+function toggleConnect(on,from){
+  ui.mode=on===undefined?(ui.mode==='connect'?'select':'connect'):(on?'connect':'select');
+  ui.connectFrom=ui.mode==='connect'?(from||null):null;
+  if(ui.mode!=='connect'){ui.labelNext=false;}
+  if(ui.mode==='connect')toast(from?'Now click the node to connect to · Esc to stop':'Click a source node, then a target · Esc to stop');
+  refresh();renderLib();
+}
+function connectClick(id){
+  if(isCont(N(id))){toast('Connect shapes, not lanes');return;}
+  if(!ui.connectFrom){ui.connectFrom=id;toast('Now click the node to connect to');render();return;}
+  const from=ui.connectFrom;ui.connectFrom=null;
+  if(from!==id)addEdge(from,id);
+  ui.mode='connect';render();
+}
+/* =====================================================================
+   Switch orientation: transpose the whole diagram (horizontal ⇄ vertical).
+   Lanes swap header side, connectors swap attach sides, spacing is rescaled
+   so shapes still fit — elbow connectors re-route automatically.
+   ===================================================================== */
+const TSIDE={l:'t',t:'l',r:'b',b:'r',auto:'auto'};
+function transposeDoc(){
+  if(!doc.nodes.length)return;
+  if(ed)commitEdit();
+  const b=bounds(doc.nodes),ox=b.x,oy=b.y;
+  const cont=doc.nodes.filter(isCont),shapes=doc.nodes.filter(n=>!isCont(n)&&!NOTEXT.has(n.shape));
+  const maxW=Math.max(60,...shapes.map(n=>n.w)),maxH=Math.max(30,...shapes.map(n=>n.h));
+  const pairs=doc.edges.map(e=>[N(e.from),N(e.to)]).filter(([a,c])=>a&&c);
+  // scale factors so connected shapes that were stacked still have room side by side (and vice versa)
+  let ky=1,kx=.55;
+  pairs.forEach(([a,c])=>{if(isCont(a)||isCont(c))return;const dx=Math.abs(c.x-a.x),dy=Math.abs(c.y-a.y);
+    if(dy>dx&&dy>1)ky=Math.max(ky,((a.w+c.w)/2+36)/dy);if(dx>=dy&&dx>1)kx=Math.max(kx,((a.h+c.h)/2+44)/dx);});
+  // shapes sharing a row become a column (and vice versa): keep them from overlapping
+  for(let i=0;i<shapes.length;i++)for(let j=i+1;j<shapes.length;j++){
+    const a=shapes[i],c=shapes[j],dx=Math.abs(c.x-a.x),dy=Math.abs(c.y-a.y);
+    if(dy<(a.h+c.h)/2&&dx>1)kx=Math.max(kx,((a.h+c.h)/2+24)/dx);
+    if(dx<(a.w+c.w)/2&&dy>1)ky=Math.max(ky,((a.w+c.w)/2+30)/dy);
+  }
+  if(!pairs.length){ky=maxW/maxH*.8;kx=.8;}
+  ky=clamp(ky,1,2.6);kx=clamp(kx,.5,1.2);
+  const lanes=cont.filter(n=>n.shape==='lane'&&!headerOnly(n));
+  const hl=lanes.filter(n=>n.hd==='l'),vl=lanes.filter(n=>n.hd!=='l');
+  if(hl.length)ky=Math.max(ky,(maxW+40)/Math.min(...hl.map(n=>n.h)));
+  if(vl.length)kx=Math.max(kx,(maxH+44)/Math.min(...vl.map(n=>n.w)));
+  // header bands at the left/top edge are kept unscaled (piecewise mapping)
+  const Hx=Math.max(0,...cont.filter(n=>n.shape==='lane'&&n.hd==='l'&&Math.abs(n.x-n.w/2-ox)<2).map(hsOf));
+  const Hy=Math.max(0,...cont.filter(n=>n.shape==='lane'&&n.hd!=='l'&&Math.abs(n.y-n.h/2-oy)<2).map(n=>headerOnly(n)?n.h:hsOf(n)));
+  const mX=x=>x<=ox+Hx?x:ox+Hx+(x-ox-Hx)*kx,mY=y=>y<=oy+Hy?y:oy+Hy+(y-oy-Hy)*ky;
+  doc.nodes.forEach(n=>{
+    if(isCont(n)){
+      const l=n.x-n.w/2,r=n.x+n.w/2,t=n.y-n.h/2,bt=n.y+n.h/2;
+      const nl=ox+(mY(t)-oy),nr=ox+(mY(bt)-oy),nt=oy+(mX(l)-ox),nb=oy+(mX(r)-ox);
+      n.mw=nr-nl;n.mh=nb-nt;n.x=(nl+nr)/2;n.y=(nt+nb)/2;
+      if(n.shape==='lane')n.hd=n.hd==='l'?'t':'l';
+      fit(n);return;
+    }
+    const nx=ox+(mY(n.y)-oy),ny=oy+(mX(n.x)-ox);n.x=nx;n.y=ny;
+    if(n.shape==='barh'){n.shape='barv';n.mh=n.mw;}else if(n.shape==='barv'){n.shape='barh';n.mw=n.mh;}
+    fit(n);
+  });
+  doc.edges.forEach(e=>{e.fa=TSIDE[e.fa||'auto'];e.ta=TSIDE[e.ta||'auto'];const bd=e.bend||{x:0,y:0};e.bend={x:bd.y*ky,y:bd.x*kx};});
+  commit();refresh();fitView();toast('Switched orientation');
+}
+/* =====================================================================
+   Text editing overlay
+   ===================================================================== */
+let ed=null;
+function startEdit(id){
+  const n=N(id);if(!n)return;
+  if(NOTEXT.has(n.shape)){toast('This shape has no text — change the shape in the inspector');return;}
+  ed={kind:'node',id,orig:n.text,origRich:n.rich?JSON.parse(JSON.stringify(n.rich)):null};ui.editing=id;
+  reditor.innerHTML=runsToHTML(richLines(n));render();positionEditor();
+  reditor.focus({preventScroll:true});selectAllIn(reditor);syncFmt();
+}
+function startEditEdge(id){
+  const e=E(id);if(!e)return;
+  ed={kind:'edge',id,orig:e.label||''};ui.editing=null;
+  editor.value=e.label||'';render();positionEditor();
+  requestAnimationFrame(()=>{editor.focus();editor.select();});
+}
+function positionEditor(){
+  if(!ed)return;const v=doc.view,k=v.k;let cx,cy,w,h,size,col,bold,nl;
+  if(ed.kind==='node'){const n=N(ed.id);if(!n)return;const P=place(n);size=n.size;col=textColorOf(n);bold=n.bold;
+    if(!P.custom&&!P.ic&&!P.lk&&!P.ih&&!P.tt){cx=n.x;cy=n.y;w=n.w;h=n.h;}else{cx=n.x+P.tx;cy=n.y+P.rc;w=Math.max(P.tw+16,60);h=P.th+6;}nl=P.lines.length;}
+  else{const e=E(ed.id),g=e&&geom(e);if(!g)return;size=12;bold=true;w=Math.max(120,textWidth(editor.value||' ',12,true)+34);h=26;cx=g.lm[0];cy=g.lm[1];col='var(--ink)';}
+  const lines=nl||editor.value.split('\n').length,lh=Math.round(size*1.3),pt=Math.max(0,(h-lines*lh)/2)*k;
+  const el=ed.kind==='node'?reditor:editor;
+  if(ed.kind==='node')w+=4/k; // room for the caret
+  el.style.cssText=`display:block;left:${v.x+(cx-w/2)*k}px;top:${v.y+(cy-h/2)*k}px;width:${w*k}px;height:${h*k}px;font-size:${size*k}px;line-height:${lh*k}px;padding:${pt}px 0 0 0;color:${col};font-weight:${bold?600:400};${ed.kind==='edge'?'background:var(--surface);':''}text-align:${ed.kind==='node'&&(N(ed.id)||{}).al==='left'?'left':'center'};`;
+  if(ed.kind==='node')placeFmt(v.x+(cx-w/2)*k,v.y+(cy-h/2)*k,w*k,h*k);else fmtbar.style.display='none';
+}
+editor.addEventListener('input',()=>{
+  if(!ed)return;
+  if(ed.kind==='node'){const n=N(ed.id);n.text=editor.value;fit(n);}
+  else{const e=E(ed.id);e.label=editor.value;}
+  render();positionEditor();
+});
+function hideEditors(){if(document.activeElement===reditor||document.activeElement===editor||fmtbar.contains(document.activeElement))document.activeElement.blur();editor.style.display='none';reditor.style.display='none';fmtbar.style.display='none';fpop.classList.remove('show');}
+function commitEdit(){
+  if(!ed)return;const d=ed;ed=null;ui.editing=null;hideEditors();
+  if(d.kind==='node'){const n=N(d.id);if(n){if(!n.text.trim()){n.text=d.orig||'Idea';if(d.origRich)n.rich=d.origRich;else delete n.rich;}fit(n);}}
+  else{const e=E(d.id);if(e)e.label=(e.label||'').trim();}
+  commit();refresh();
+}
+function cancelEdit(){
+  if(!ed)return;const d=ed;ed=null;ui.editing=null;hideEditors();
+  if(d.kind==='node'){const n=N(d.id);if(n){n.text=d.orig;if(d.origRich)n.rich=d.origRich;else delete n.rich;fit(n);}}else{const e=E(d.id);if(e)e.label=d.orig;}
+  refresh();
+}
+editor.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commitEdit();}
+  else if(e.key==='Escape'){e.preventDefault();cancelEdit();}
+  else if(e.key==='Tab'){e.preventDefault();const d=ed;commitEdit();if(d&&d.kind==='node'&&N(d.id))addChildAuto(N(d.id));}
+});
+editor.addEventListener('blur',()=>{if(ed)commitEdit();});
+/* ---- rich node editor + formatting toolbar ---- */
+/* re-measure but keep the edge a connector attaches to fixed (left/right-anchored lists stay aligned) */
+function refit(n){const pe=parentEdge(n.id),l=n.x-n.w/2,r=n.x+n.w/2;fit(n);
+  if(pe&&pe.ta==='l')n.x=l+n.w/2;else if(pe&&pe.ta==='r')n.x=r-n.w/2;}
+function selectAllIn(el){const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);}
+function selInEditor(){const s=getSelection();return s.rangeCount&&reditor.contains(s.getRangeAt(0).commonAncestorContainer)?s.getRangeAt(0):null;}
+let savedRange=null;
+reditor.addEventListener('input',()=>{
+  if(!ed||ed.kind!=='node')return;const n=N(ed.id);if(!n)return;
+  setRich(n,domToRuns(reditor,n,getComputedStyle(reditor).color));refit(n);render();positionEditor();
+});
+reditor.addEventListener('keydown',e=>{
+  if(!ed||ed.kind!=='node')return;
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commitEdit();}
+  else if(e.key==='Enter'&&e.shiftKey){e.preventDefault();document.execCommand('insertLineBreak');}
+  else if(e.key==='Escape'){e.preventDefault();cancelEdit();}
+  else if(e.key==='Tab'){e.preventDefault();const d=ed;commitEdit();if(d&&N(d.id))addChildAuto(N(d.id));}
+  else if((e.ctrlKey||e.metaKey)&&['b','i','u'].includes(e.key.toLowerCase())){e.preventDefault();fmt({b:'bold',i:'italic',u:'underline'}[e.key.toLowerCase()]);}
+});
+reditor.addEventListener('paste',e=>{e.preventDefault();const t=(e.clipboardData.getData('text/plain')||'').replace(/\r/g,'');
+  t.split('\n').forEach((l,i)=>{if(i)document.execCommand('insertLineBreak');if(l)document.execCommand('insertText',false,l);});});
+reditor.addEventListener('drop',e=>e.preventDefault());
+reditor.addEventListener('blur',e=>{if(ed&&ed.kind==='node'&&!(e.relatedTarget&&fmtbar.contains(e.relatedTarget)))commitEdit();});
+const fmtbar=$('#fmtbar'),fpop=$('#fpop');
+let lastFc='#FF3B30',lastHl='#FFE066';
+function placeFmt(x,y,w,h){
+  fmtbar.style.display='flex';
+  const cw=canvas.clientWidth,bw=fmtbar.offsetWidth||250,bh=fmtbar.offsetHeight||42;
+  let top=y-bh-10;if(top<6)top=y+h+10;
+  fmtbar.style.left=clamp(x+w/2-bw/2,6,Math.max(6,cw-bw-6))+'px';fmtbar.style.top=top+'px';
+}
+function fmt(cmd,val){
+  if(!ed||ed.kind!=='node')return;
+  reditor.focus();
+  if(savedRange&&!selInEditor()){const s=getSelection();s.removeAllRanges();s.addRange(savedRange);}
+  const r=selInEditor();if(!r||r.collapsed)selectAllIn(reditor); // nothing selected -> whole node
+  document.execCommand('styleWithCSS',false,true);
+  if(cmd==='clear'){document.execCommand('removeFormat');document.execCommand('hiliteColor',false,'transparent');}
+  else if(cmd==='fc'){document.execCommand('foreColor',false,val||getComputedStyle(reditor).color);}
+  else if(cmd==='hl'){document.execCommand('hiliteColor',false,val||'transparent');}
+  else document.execCommand(cmd);
+  reditor.dispatchEvent(new Event('input'));savedRange=selInEditor();syncFmt();
+}
+function syncFmt(){
+  if(!ed||ed.kind!=='node')return;
+  ['bold','italic','underline'].forEach(c=>{let on=false;try{on=document.queryCommandState(c);}catch(_){}fmtbar.querySelector(`[data-f="${c}"]`).classList.toggle('on',on);});
+  $('#fcBar').style.background=lastFc;$('#hlBar').style.background=lastHl;
+}
+document.addEventListener('selectionchange',()=>{if(ed&&ed.kind==='node'&&selInEditor()){savedRange=selInEditor();syncFmt();}});
+const FMT_COLORS=['#1D1D1F','#636366','#8E8E93','#FFFFFF','#FF3B30','#FF9500','#FFCC00','#34C759','#30B0C7','#007AFF','#5856D6','#AF52DE','#FF2D55','#A2845E','#E9A23B','#2E7D32'];
+const HL_COLORS=['#FFF3A3','#FFE066','#FFD8A8','#FFC9C9','#FCC2D7','#EEBEFA','#D0BFFF','#BAC8FF','#A5D8FF','#99E9F2','#96F2D7','#B2F2BB','#D8F5A2','#E9ECEF','#CED4DA','#FFFFFF'];
+function openPop(kind){
+  if(fpop.classList.contains('show')&&fpop.dataset.k===kind){fpop.classList.remove('show');return;}
+  const list=kind==='fc'?FMT_COLORS:HL_COLORS;fpop.dataset.k=kind;
+  fpop.innerHTML=`<div class="fsw">${list.map(c=>`<button data-c="${c}" style="background:${c}" title="${c}" aria-label="${c}"></button>`).join('')}</div>
+   <div class="frow"><button data-c="">${kind==='fc'?'Automatic':'No highlight'}</button><label title="Custom colour"><input type="color" value="${kind==='fc'?lastFc:lastHl}">Custom</label></div>`;
+  const btn=fmtbar.querySelector(`[data-pop="${kind}"]`);fpop.style.left=Math.min(btn.offsetLeft,fmtbar.offsetWidth-240)+'px';
+  fpop.classList.add('show');
+}
+fmtbar.addEventListener('mousedown',e=>{if(e.target.tagName!=='INPUT'&&!e.target.closest('label'))e.preventDefault();});
+fmtbar.addEventListener('click',e=>{
+  const f=e.target.closest('[data-f]'),p=e.target.closest('[data-pop]'),c=e.target.closest('[data-c]');
+  if(f){fpop.classList.remove('show');fmt(f.dataset.f);}
+  else if(p)openPop(p.dataset.pop);
+  else if(c){const k=fpop.dataset.k,v=c.dataset.c;if(v){if(k==='fc')lastFc=v;else lastHl=v;}fmt(k,v);fpop.classList.remove('show');}
+});
+fpop.addEventListener('input',e=>{if(e.target.type==='color'){const k=fpop.dataset.k,v=e.target.value.toUpperCase();if(k==='fc')lastFc=v;else lastHl=v;fmt(k,v);}});
+fpop.addEventListener('change',e=>{if(e.target.type==='color'){fpop.classList.remove('show');reditor.focus();}});
+// a click outside the editor/toolbar finishes editing (needed after a colour input took focus)
+document.addEventListener('pointerdown',e=>{if(ed&&ed.kind==='node'&&!reditor.contains(e.target)&&!fmtbar.contains(e.target))commitEdit();},true);
+/* =====================================================================
+   Pointer interaction
+   ===================================================================== */
+const pointers=new Map();let drag=null,lastTap={t:0,key:''},spaceDown=false;
+const snapV=v=>ui.snap?Math.round(v/12)*12:v;
+svg.addEventListener('pointerdown',ev=>{
+  if(ev.pointerType==='mouse'&&ev.button>1)return;
+  ev.preventDefault();
+  if(ed)commitEdit();
+  pointers.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  try{svg.setPointerCapture(ev.pointerId);}catch(_){}
+  if(pointers.size===2){
+    const[a,b]=[...pointers.values()];
+    drag={type:'pinch',d:Math.hypot(a.x-b.x,a.y-b.y)||1,k:doc.view.k,cx:(a.x+b.x)/2,cy:(a.y+b.y)/2,vx:doc.view.x,vy:doc.view.y};
+    ui.dragging=true;return;
+  }
+  const[wx,wy]=wpt(ev),t=ev.target,now=performance.now();
+  if(ev.button===1||spaceDown){drag={type:'pan',cx:ev.clientX,cy:ev.clientY,vx:doc.view.x,vy:doc.view.y,moved:false};return;}
+  const h=t.closest&&t.closest('[data-h]');
+  if(h){
+    const kind=h.dataset.h;
+    if(kind==='add'){drag={type:'link',id:h.dataset.id,dir:h.dataset.dir,cx:ev.clientX,cy:ev.clientY,moved:false};ui.dragging=true;render();return;}
+    if(kind==='resize'){const n=N(h.dataset.id);if(n){drag={type:'resize',id:n.id,l:n.x-n.w/2,t:n.y-n.h/2,moved:false};ui.dragging=true;}return;}
+    const e=E(h.dataset.id);if(!e)return;
+    if(kind==='bend'){const key='e'+e.id;if(lastTap.key===key&&now-lastTap.t<380){lastTap={t:0,key:''};startEditEdge(e.id);return;}lastTap={t:now,key};const g=geom(e);drag={type:'bend',eid:e.id,sx:wx,sy:wy,b0:{...(e.bend||{x:0,y:0})},bs:g.bs};return;}
+    if(kind==='end0'||kind==='end1'){drag={type:'end',eid:e.id,which:kind==='end0'?0:1,moved:false,cx:ev.clientX,cy:ev.clientY};return;}
+  }
+  const lkEl=t.closest&&t.closest('[data-link]');
+  if(lkEl&&ui.mode!=='connect'){lastTap={t:0,key:''};drag={type:'linkclick',url:lkEl.dataset.link,cx:ev.clientX,cy:ev.clientY};return;}
+  let ne=t.closest&&t.closest('.node');
+  // swimlane / frame bodies behave like the canvas; grab them by the header to move
+  if(ne){const cn=N(ne.dataset.id);if(cn&&isCont(cn)&&(ui.mode==='connect'||!inHeader(cn,wx,wy)))ne=null;}
+  if(ne){
+    const id=ne.dataset.id;
+    if(ui.mode==='connect'){connectClick(id);return;}
+    if((ev.ctrlKey||ev.metaKey)&&N(id).link){openLink(N(id).link);return;}
+    const key='n'+id;
+    if(lastTap.key===key&&now-lastTap.t<380){lastTap={t:0,key:''};ui.sel=new Set([id]);ui.edge=null;refresh();startEdit(id);return;}
+    lastTap={t:now,key};
+    if(ev.shiftKey){ui.sel.has(id)?ui.sel.delete(id):ui.sel.add(id);}
+    else if(!ui.sel.has(id))ui.sel=new Set([id]);
+    ui.edge=null;
+    const ids=new Set(ui.sel);
+    if(ev.altKey)[...ids].forEach(i=>descendants(i).forEach(d=>ids.add(d)));
+    [...ids].map(N).filter(isCont).forEach(c=>doc.nodes.forEach(n=>{if(contains(c,n))ids.add(n.id);}));
+    drag={type:'move',sx:wx,sy:wy,cx:ev.clientX,cy:ev.clientY,orig:new Map([...ids].map(i=>{const n=N(i);return[i,[n.x,n.y]];})),moved:false};
+    refresh();return;
+  }
+  const ee=t.closest&&t.closest('.edge');
+  if(ee){
+    const id=ee.dataset.id,key='e'+id;
+    ui.edge=id;ui.sel=new Set();
+    if(lastTap.key===key&&now-lastTap.t<380){lastTap={t:0,key:''};refresh();startEditEdge(id);return;}
+    lastTap={t:now,key};refresh();return;
+  }
+  // background
+  if(ui.mode==='connect'){return;}
+  if(lastTap.key==='bg'&&now-lastTap.t<380){lastTap={t:0,key:''};addFreeNode(snapV(wx),snapV(wy));return;}
+  lastTap={t:now,key:'bg'};
+  if(ev.shiftKey){drag={type:'marquee',x0:wx,y0:wy,base:new Set(ui.sel)};}
+  else{ui.sel=new Set();ui.edge=null;drag={type:'pan',cx:ev.clientX,cy:ev.clientY,vx:doc.view.x,vy:doc.view.y,moved:false};refresh();}
+});
+svg.addEventListener('pointermove',ev=>{
+  if(pointers.has(ev.pointerId))pointers.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  if(!drag)return;
+  const[wx,wy]=wpt(ev);
+  switch(drag.type){
+    case'pinch':{
+      if(pointers.size<2)return;const[a,b]=[...pointers.values()];
+      const d=Math.hypot(a.x-b.x,a.y-b.y)||1,cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,r=svg.getBoundingClientRect(),v=doc.view;
+      const nk=clamp(drag.k*d/drag.d,.1,3),wx0=(drag.cx-r.left-drag.vx)/drag.k,wy0=(drag.cy-r.top-drag.vy)/drag.k;
+      v.k=nk;v.x=(cx-r.left)-wx0*nk;v.y=(cy-r.top)-wy0*nk;schedule();break;}
+    case'pan':doc.view.x=drag.vx+ev.clientX-drag.cx;doc.view.y=drag.vy+ev.clientY-drag.cy;drag.moved=true;schedule();break;
+    case'move':{
+      if(!drag.moved&&Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)<3)return;
+      drag.moved=true;ui.dragging=true;
+      const dx=wx-drag.sx,dy=wy-drag.sy;
+      drag.orig.forEach((p,id)=>{const n=N(id);if(n){n.x=snapV(p[0]+dx);n.y=snapV(p[1]+dy);}});
+      schedule();break;}
+    case'resize':{
+      const n=N(drag.id);if(!n)return;drag.moved=true;
+      n.mw=Math.max(20,snapV(wx)-drag.l);n.mh=Math.max(16,snapV(wy)-drag.t);fit(n);
+      n.x=drag.l+n.w/2;n.y=drag.t+n.h/2;schedule();break;}
+    case'link':{
+      if(!drag.moved&&Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)<6)return;
+      drag.moved=true;const n=N(drag.id),sp=sidePoint(n,drag.dir),t=nodeAt(wx,wy,drag.id,true);
+      ui.preview={x1:sp[0],y1:sp[1],x2:wx,y2:wy};ui.hover=t?t.id:null;schedule();break;}
+    case'end':{
+      if(!drag.moved&&Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)<4)return;
+      drag.moved=true;const e=E(drag.eid),g=geom(e),fixed=drag.which===0?g.p1:g.p0,t=nodeAt(wx,wy,null,true);
+      ui.preview={x1:fixed[0],y1:fixed[1],x2:wx,y2:wy};ui.hover=t?t.id:null;schedule();break;}
+    case'bend':{const e=E(drag.eid);e.bend={x:drag.b0.x+(wx-drag.sx)/drag.bs,y:drag.b0.y+(wy-drag.sy)/drag.bs};schedule();break;}
+    case'marquee':{
+      const x=Math.min(drag.x0,wx),y=Math.min(drag.y0,wy),w=Math.abs(wx-drag.x0),h=Math.abs(wy-drag.y0);
+      ui.marquee={x,y,w,h};const s=new Set(drag.base);
+      doc.nodes.forEach(n=>{
+        const hit=isCont(n)?(n.x-n.w/2>=x&&n.x+n.w/2<=x+w&&n.y-n.h/2>=y&&n.y+n.h/2<=y+h):(n.x+n.w/2>=x&&n.x-n.w/2<=x+w&&n.y+n.h/2>=y&&n.y-n.h/2<=y+h);
+        if(hit)s.add(n.id);});
+      ui.sel=s;schedule();break;}
+  }
+});
+function endPointer(ev){
+  pointers.delete(ev.pointerId);
+  if(drag&&drag.type==='pinch'){if(pointers.size<2){drag=null;ui.dragging=false;saveSoon();refresh();}return;}
+  if(!drag)return;
+  const d=drag,[wx,wy]=wpt(ev),ok=ev.type==='pointerup';
+  drag=null;ui.preview=null;ui.marquee=null;ui.hover=null;ui.dragging=false;
+  if(!ok){restore(hist.stack[hist.i]);return;}
+  switch(d.type){
+    case'linkclick':if(Math.hypot(ev.clientX-d.cx,ev.clientY-d.cy)<8)openLink(d.url);break;
+    case'move':if(d.moved)commit();refresh();break;
+    case'resize':if(d.moved)commit();refresh();break;
+    case'pan':saveSoon();refresh();break;
+    case'bend':commit();refresh();break;
+    case'marquee':refresh();break;
+    case'link':{
+      const src=N(d.id);if(!src){refresh();break;}
+      if(!d.moved)addNodeDir(src,d.dir);
+      else{const t=nodeAt(wx,wy,d.id,true);if(t)addEdge(src.id,t.id,{fa:d.dir,ta:sideAt(t,wx,wy)});else addNodeAt(src,wx,wy,d.dir);}
+      break;}
+    case'end':{
+      const e=E(d.eid);
+      if(d.moved&&e){
+        const t=nodeAt(wx,wy,null,true),other=d.which===0?e.to:e.from;
+        if(t&&t.id!==other){const side=sideAt(t,wx,wy);if(d.which===0){e.from=t.id;e.fa=side;}else{e.to=t.id;e.ta=side;}commit();}
+        else if(!t)toast('Drop the end on a node to reconnect it');
+      }
+      refresh();break;}
+  }
+}
+svg.addEventListener('pointerup',endPointer);
+svg.addEventListener('pointercancel',endPointer);
+svg.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  const mouseWheel=ev.deltaMode===1||(ev.deltaX===0&&Math.abs(ev.deltaY)>=50&&Number.isInteger(ev.deltaY));
+  if(ev.ctrlKey||ev.metaKey||mouseWheel)zoomAt(ev.clientX,ev.clientY,Math.exp(-ev.deltaY*(ev.ctrlKey?.01:.0015)*(mouseWheel?1.6:1)));
+  else{doc.view.x-=ev.deltaX;doc.view.y-=ev.deltaY;render();saveSoon();}
+},{passive:false});
+/* =====================================================================
+   Keyboard
+   ===================================================================== */
+window.addEventListener('keydown',e=>{
+  const tag=e.target.tagName,typing=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||e.target.isContentEditable;
+  if(e.key===' '&&!typing){spaceDown=true;}
+  if(typing)return;
+  const mod=e.metaKey||e.ctrlKey,k=e.key.toLowerCase();
+  if(mod){
+    if(k==='z'){e.preventDefault();e.shiftKey?redo():undo();}
+    else if(k==='y'){e.preventDefault();redo();}
+    else if(k==='a'){e.preventDefault();ui.sel=new Set(doc.nodes.map(n=>n.id));ui.edge=null;refresh();}
+    else if(k==='c'){copySel();}
+    else if(k==='v'){clearTimeout(pasteTimer);pasteTimer=setTimeout(()=>paste(),80);}
+    else if(k==='d'){e.preventDefault();duplicate();}
+    else if(k==='s'){e.preventDefault();saveJSON();}
+    else if(k==='p'){e.preventDefault();doPrint();}
+    return;
+  }
+  const one=ui.sel.size===1?N([...ui.sel][0]):null;
+  switch(e.key){
+    case'Delete':case'Backspace':e.preventDefault();deleteSel();break;
+    case'Tab':if(one){e.preventDefault();addChildAuto(one);}break;
+    case'Enter':case'F2':if(one&&e.shiftKey&&e.key==='Enter'){e.preventDefault();addSibling(one);break;}if(one){e.preventDefault();startEdit(one.id);}else if(ui.edge){e.preventDefault();startEditEdge(ui.edge);}break;
+    case'Escape':if(ui.mode==='connect')toggleConnect(false);else{ui.sel=new Set();ui.edge=null;refresh();}break;
+    case'ArrowUp':case'ArrowDown':case'ArrowLeft':case'ArrowRight':{
+      const dir={ArrowUp:'t',ArrowDown:'b',ArrowLeft:'l',ArrowRight:'r'}[e.key];
+      if(!ui.sel.size)break;e.preventDefault();
+      if(e.altKey&&one){addNodeDir(one,dir);break;}
+      const st=e.shiftKey?48:6,[nx,ny]=SIDE_N[dir];
+      ui.sel.forEach(id=>{const n=N(id);n.x+=nx*st;n.y+=ny*st;});commit();refresh();break;}
+    case'+':case'=':zoomCenter(1.2);break;
+    case'-':case'_':zoomCenter(1/1.2);break;
+    case'0':fitView();break;
+  }
+});
+window.addEventListener('keyup',e=>{if(e.key===' ')spaceDown=false;});
+/* =====================================================================
+   UML mode: shape library + connector tools
+   ===================================================================== */
+const LIB=[
+ {sec:'Flowchart',open:true,items:[
+  ['process','Process',{shape:'rect',text:'Process',mw:120,mh:56}],
+  ['decision','Decision',{shape:'diamond',text:'Decision?'}],
+  ['terminal','Start / end',{shape:'pill',text:'Start',mw:110}],
+  ['data','Data (input / output)',{shape:'para',text:'Data'}],
+  ['document','Document',{shape:'doc',text:'Document'}],
+  ['database','Database',{shape:'cyl',text:'Database'}],
+  ['subproc','Predefined process',{shape:'subproc',text:'Subprocess'}],
+  ['manual','Manual input',{shape:'manual',text:'Manual input'}],
+  ['prep','Preparation',{shape:'prep',text:'Preparation'}],
+  ['delay','Delay',{shape:'delay',text:'Delay'}],
+  ['offpage','Off-page reference',{shape:'offpage',text:'A'}],
+  ['connector','On-page connector',{shape:'circle',text:'1'}]]},
+ {sec:'UML',open:true,items:[
+  ['class','Class',{shape:'class',text:'ClassName',bold:true,attrs:'- attribute: Type',ops:'+ operation(): Type'}],
+  ['interface','Interface',{shape:'class',stereo:'interface',text:'IName',bold:true,attrs:'',ops:'+ method(): void'}],
+  ['abstract','Abstract class',{shape:'class',stereo:'abstract',text:'AbstractName',bold:true,attrs:'',ops:'+ operation(): void'}],
+  ['object','Object',{shape:'rect',text:'obj : Class',ul:true,sk:'var(--ink)',mw:110,mh:48}],
+  ['actor','Actor',{shape:'actor',text:'Actor'}],
+  ['usecase','Use case',{shape:'ellipse',text:'Use case',sk:'var(--ink)'}],
+  ['package','Package',{shape:'package',text:'package'}],
+  ['component','Component',{shape:'component',text:'Component'}],
+  ['node','Node',{shape:'node3d',text:'Node'}],
+  ['note','Note',{shape:'note',text:'Note'}],
+  ['state','State',{shape:'round',text:'State',sk:'var(--ink)',mw:100,mh:46}],
+  ['init','Initial state',{shape:'init'}],
+  ['final','Final state',{shape:'final'}],
+  ['fork','Fork / join (horizontal)',{shape:'barh'}],
+  ['forkv','Fork / join (vertical)',{shape:'barv'}],
+  ['merge','Decision / merge',{shape:'diamond',text:'',mw:50,mh:50}],
+  ['frame','Frame / system boundary',{shape:'frame',text:'System',mw:420,mh:300}]]},
+ {sec:'Data flow',items:[
+  ['entity','External entity',{shape:'rect',text:'Entity',sk:'var(--ink)',mw:120,mh:60}],
+  ['dfproc','Process',{shape:'circle',text:'Process'}],
+  ['store','Data store',{shape:'store',text:'Data store'}]]},
+ {sec:'Swimlanes',items:[
+  ['laneh','Swimlane — horizontal (row)',{shape:'lane',hd:'l',text:'Lane',mw:760,mh:170,fill:'#DCEAF5',size:16,bold:true}],
+  ['lanev','Swimlane — vertical (column)',{shape:'lane',hd:'t',text:'Lane',mw:250,mh:620,fill:'#EFEFEF',size:16,bold:true}]]}
+];
+const LIBMAP=Object.fromEntries(LIB.flatMap(s=>s.items).map(i=>[i[0],i]));
+const CTYPES=[['elbow','Elbow',{style:'elbow',corner:'square'}],['curve','Curved',{style:'curve'}],['straight','Straight',{style:'straight'}],
+  ['elbowL','Elbow + label',{style:'elbow',corner:'square'},1],['curveL','Curved + label',{style:'curve'},1],['straightL','Straight + label',{style:'straight'},1]];
+const RELS=[['flow','Flow (arrow)',{dash:'',h0:'none',h1:'arrow'}],['assoc','Association',{dash:'',h0:'none',h1:'none'}],['directed','Directed assoc.',{dash:'',h0:'none',h1:'open'}],
+  ['inherit','Inheritance',{dash:'',h0:'none',h1:'tri'}],['realize','Realization',{dash:'dash',h0:'none',h1:'tri'}],['depend','Dependency',{dash:'dash',h0:'none',h1:'open'}],
+  ['aggr','Aggregation',{dash:'',h0:'dia',h1:'none'}],['comp','Composition',{dash:'',h0:'diaf',h1:'none'}]];
+/* default style for connectors drawn while a connector tool is active */
+function defEdge(){
+  if(!ui.ctype&&!ui.crel)return null;
+  const t=CTYPES.find(c=>c[0]===ui.ctype),r=RELS.find(c=>c[0]===ui.crel);
+  return Object.assign({color:'ink',width:1.5,arrow:'none'},t?t[2]:{},r?r[2]:{h1:'arrow'});
+}
+function pathPreview(k){
+  const d={elbow:'M3 15H17V5H31',curve:'M3 15C17 15 17 5 31 5',straight:'M3 15L31 5'}[k.replace('L','')];
+  let s=`<path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+  if(k.endsWith('L'))s+=`<rect x="10" y="4.5" width="14" height="11" rx="3" fill="var(--surface2)" stroke="currentColor" stroke-width=".8"/><text x="17" y="10.5" font-size="6.5" text-anchor="middle" dominant-baseline="central" fill="currentColor" font-family="${FONT}">Yes</text>`;
+  return`<svg viewBox="0 0 34 20" aria-hidden="true">${s}</svg>`;
+}
+function relPreview(r,w,h){
+  const R=RELS.find(x=>x[0]===r)[2],y=h/2,a=[2,y],b=[w-2,y];
+  const t0=R.h0!=='none'?MK_TRIM[R.h0]*7:0,t1=R.h1!=='none'?MK_TRIM[R.h1]*7:0;
+  let s=`<path d="M${a[0]+t0} ${y}H${b[0]-t1}" stroke="currentColor" stroke-width="1.3"${R.dash?' stroke-dasharray="3 2"':''}/>`;
+  if(t1)s+=markerSVG(R.h1,b,[b[0]-t1,y],7,'currentColor',1.1);
+  if(t0)s+=markerSVG(R.h0,a,[a[0]+t0,y],7,'currentColor',1.1);
+  return`<svg viewBox="0 0 ${w} ${h}" aria-hidden="true">${s}</svg>`;
+}
+function shapePreview(o){
+  const p=Object.assign({},o,{text:o.shape==='class'?'Class':'',attrs:o.attrs?'- a':'',ops:o.ops?'+ op()':'',size:o.shape==='class'?11:12});
+  delete p.mw;delete p.mh;
+  if(o.shape==='lane'){p.mw=o.hd==='l'?90:44;p.mh=o.hd==='l'?40:70;p.hs=o.hd==='l'?16:14;}
+  else if(o.shape==='frame'){p.mw=80;p.mh=56;p.hs=14;}
+  else if(['rect','round','pill','para','doc','cyl','note','package','component','node3d','subproc','manual','prep','offpage','delay','store','ellipse'].includes(o.shape)){p.mw=70;p.mh=44;}
+  else if(o.shape==='diamond'){p.mw=60;p.mh=44;}
+  else if(o.shape==='circle'){p.mw=p.mh=38;}
+  else if(o.shape==='barh')p.mw=70;else if(o.shape==='barv')p.mh=56;
+  const n=mk(p.text,0,0,p),pad=4;
+  return`<svg viewBox="${-n.w/2-pad} ${-n.h/2-pad} ${n.w+pad*2} ${n.h+pad*2+(o.shape==='card'?9:0)}" aria-hidden="true">${nodeSVG(n,false,false).replace(/class="node[^"]*"/,'')}</svg>`;
+}
+let libBuilt=false;
+function renderLib(){
+  if(!ui.uml)return;
+  if(!libBuilt){
+    lib.innerHTML=`<h2>UML mode</h2><p>Click a shape to add it, or drag it onto the canvas. Pick a connector tool, then click two shapes.</p>`
+      +LIB.map(s=>`<details${s.open?' open':''}><summary>${esc(s.sec)}</summary><div class="pal">${s.items.map(([k,l,o])=>`<button draggable="true" data-shape="${k}" title="${esc(l)}" aria-label="${esc(l)}">${shapePreview(o)}</button>`).join('')}</div></details>`).join('')
+      +`<details open><summary>Connectors</summary><div class="sub">Line type</div><div class="ctools" id="ctypes"></div><div class="sub">UML relationship</div><div class="ctools" id="crels"></div></details>`;
+    libBuilt=true;
+  }
+  $('#ctypes').innerHTML=CTYPES.map(([k,l])=>`<button data-ctype="${k}" class="${ui.ctype===k?'on':''}">${pathPreview(k)}${esc(l)}</button>`).join('');
+  $('#crels').innerHTML=RELS.map(([k,l])=>`<button data-crel="${k}" class="${ui.crel===k?'on':''}">${relPreview(k,34,14)}${esc(l)}</button>`).join('');
+}
+function addFromLib(key,x,y){
+  const it=LIBMAP[key];if(!it)return;
+  const o=JSON.parse(JSON.stringify(it[2])),text=o.text!=null?o.text:'';delete o.text;
+  let at=[x,y];
+  if(o.shape==='lane'&&x==null){ // stack new lanes next to existing ones
+    const same=doc.nodes.filter(n=>n.shape==='lane'&&n.hd===o.hd&&!headerOnly(n));
+    if(same.length){
+      if(o.hd==='l'){const last=same.reduce((a,n)=>n.y+n.h/2>a.y+a.h/2?n:a);o.mw=last.w;o.mh=last.h;at=[last.x,last.y+last.h/2+last.h/2];o.fill=last.fill;o.bf=last.bf;o.sk=last.sk;o.hs=last.hs;o.size=last.size;o.tc=last.tc;}
+      else{const last=same.reduce((a,n)=>n.x+n.w/2>a.x+a.w/2?n:a);o.mw=last.w;o.mh=last.h;at=[last.x+last.w,last.y];o.fill=last.fill;o.bf=last.bf;o.sk=last.sk;o.hs=last.hs;o.size=last.size;o.tc=last.tc;}
+    }
+  }
+  if(at[0]==null)at=viewCenter();
+  const n=mk(text,snapV(at[0]),snapV(at[1]),o);
+  if(isCont(n))doc.nodes.unshift(n);else doc.nodes.push(n);
+  ui.sel=new Set([n.id]);ui.edge=null;commit();refresh();
+}
+lib.addEventListener('click',ev=>{
+  const s=ev.target.closest('[data-shape]');if(s){addFromLib(s.dataset.shape);return;}
+  const t=ev.target.closest('[data-ctype]');
+  if(t){const k=t.dataset.ctype;ui.ctype=ui.ctype===k?null:k;ui.labelNext=!!(CTYPES.find(c=>c[0]===ui.ctype)||[])[3];
+    if(ui.ctype){if(!ui.crel)ui.crel='flow';toggleConnect(true);toast(ui.labelNext?'Click two shapes — then type the label':'Click two shapes to connect them');}else{toggleConnect(false);}
+    return;}
+  const r=ev.target.closest('[data-crel]');
+  if(r){const k=r.dataset.crel;ui.crel=ui.crel===k?null:k;if(ui.crel&&!ui.ctype)ui.ctype='elbow';
+    if(ui.crel)toggleConnect(true);else renderLib();return;}
+});
+lib.addEventListener('dragstart',ev=>{const s=ev.target.closest('[data-shape]');if(!s)return;ev.dataTransfer.setData('text/x-mindflow-shape',s.dataset.shape);ev.dataTransfer.effectAllowed='copy';});
+function setUml(on){
+  ui.uml=on;try{localStorage.setItem('mindflow.uml',on?'1':'0');}catch(_){}
+  if(!on){ui.ctype=null;ui.crel=null;ui.labelNext=false;if(ui.mode==='connect')toggleConnect(false);}
+  syncBar();renderLib();setTimeout(render,0);
+}
+/* =====================================================================
+   Inspector
+   ===================================================================== */
+const seg=(act,opts,cur)=>`<div class="seg" role="group">${opts.map(([v,l])=>`<button type="button" data-act="${act}" data-val="${v}" class="${String(cur)===String(v)?'on':''}" aria-pressed="${String(cur)===String(v)}">${l}</button>`).join('')}</div>`;
+function sws(act,cur,autoLabel,withInk,customId){
+  const c=(cur||'').toLowerCase();
+  let h=`<div class="sws"><button type="button" class="sw auto ${!cur?'on':''}" data-act="${act}" data-val="" title="${autoLabel}" aria-label="${autoLabel}"></button>`;
+  if(withInk)h+=`<button type="button" class="sw ${cur==='ink'||cur==='var(--ink)'?'on':''}" style="background:var(--ink)" data-act="${act}" data-val="${act==='ecolor'?'ink':'var(--ink)'}" title="Ink" aria-label="Ink"></button>`;
+  [...VIVID,...SOFT,...EXTRA].forEach(x=>{h+=`<button type="button" class="sw ${c===x.toLowerCase()?'on':''}" style="background:${x}" data-act="${act}" data-val="${x}" title="${x}" aria-label="${x}"></button>`;});
+  h+=`<span class="sw cust" title="Custom colour"><input type="color" data-bind="${customId}" value="${/^#[0-9a-f]{6}$/i.test(cur||'')?cur:'#007AFF'}" aria-label="Custom colour"></span></div>`;
+  return h;
+}
+function renderInspector(){
+  let h='';
+  if(ui.edge&&E(ui.edge))h=edgePanel(E(ui.edge));
+  else if(ui.sel.size)h=nodePanel();
+  else h=canvasPanel();
+  insp.innerHTML=h;
+}
+function lanePanel(n){
+  let h=`<h2>${n.shape==='frame'?'Frame':'Swimlane'}</h2><h3>${n.shape==='frame'?'Title':'Lane name'}</h3><textarea data-bind="text" rows="2" aria-label="Lane name">${esc(n.text)}</textarea>`;
+  if(n.shape==='lane')h+=`<h3>Header position</h3>${seg('hd',[['l','Left (row lane)'],['t','Top (column lane)']],n.hd||'t')}`;
+  h+=`<h3>Size</h3><div class="row"><div class="stepper"><button data-act="lw" data-val="-20" aria-label="Narrower">−</button><b>${Math.round(n.w)}</b><button data-act="lw" data-val="20" aria-label="Wider">+</button></div><div class="stepper"><button data-act="lh" data-val="-20" aria-label="Shorter">−</button><b>${Math.round(n.h)}</b><button data-act="lh" data-val="20" aria-label="Taller">+</button></div></div><p>Or drag the square handle at the bottom-right corner.</p>`;
+  h+=`<h3>Header colour</h3>${sws('fill',n.fill,'Default',false,'fillc')}`;
+  h+=`<h3>Body colour</h3>${sws('bf',n.bf,'Default',false,'bfc')}`;
+  h+=`<h3>Text</h3><div class="row"><div class="stepper"><button data-act="size" data-val="-1" aria-label="Smaller">−</button><b>${n.size}</b><button data-act="size" data-val="1" aria-label="Larger">+</button></div>${seg('bold',[['1','Bold']],n.bold?'1':'')}</div>`;
+  h+=`<h3>Actions</h3><div class="btns"><button class="act" data-act="transpose">Switch orientation</button><button class="act" data-act="dup">Duplicate</button><button class="act danger" data-act="del">Delete lane</button></div>`;
+  h+=`<p>Drag the header to move the lane together with the shapes inside it. Click inside the lane to work on the canvas as usual. <b>Switch orientation</b> turns the whole diagram between horizontal and vertical lanes and re-routes every connector.</p>`;
+  return h;
+}
+function nodePanel(){
+  const ns=[...ui.sel].map(N).filter(Boolean),n=ns[0],one=ns.length===1;
+  if(one&&isCont(n))return lanePanel(n);
+  const same=p=>ns.every(x=>x[p]===n[p])?n[p]:undefined;
+  let h=`<h2>${one?(n.shape==='class'?'Class':'Node'):ns.length+' nodes'}</h2>`;
+  if(one&&n.shape==='card')h+=`<h3>Card title</h3><input type="text" data-bind="title" value="${esc(n.title||'')}" placeholder="Optional header" aria-label="Card title">`;
+  if(one&&!NOTEXT.has(n.shape)){h+=`<h3>${n.shape==='class'?'Class name':'Text'}</h3><textarea data-bind="text" rows="2" aria-label="Node text">${esc(n.text)}</textarea>`;
+    h+=hasRich(n)?`<p>Has rich formatting — double-click the node to edit it with formatting (typing here resets it). <button class="act" data-act="plain" style="margin-top:6px;width:100%">Clear text formatting</button></p>`:`<p>Double-click the node to format selected text (bold, italic, underline, colours).</p>`;}
+  if(one&&n.shape==='class'){
+    h+=`<h3>Stereotype</h3><input type="text" data-bind="stereo" value="${esc(n.stereo||'')}" placeholder="e.g. interface, abstract, enum" aria-label="Stereotype">`;
+    h+=`<h3>Attributes</h3><textarea class="mono" data-bind="attrs" rows="3" placeholder="- name: Type" aria-label="Attributes">${esc(n.attrs||'')}</textarea>`;
+    h+=`<h3>Operations</h3><textarea class="mono" data-bind="ops" rows="3" placeholder="+ method(): Type" aria-label="Operations">${esc(n.ops||'')}</textarea>`;
+  }
+  h+=`<h3>Add connected node</h3>`;
+  if(one)h+=`<div class="pad"><span></span><button data-act="add" data-val="t" aria-label="Add above" title="Add above">↑</button><span></span><button data-act="add" data-val="l" aria-label="Add left" title="Add left">←</button><span class="c">add</span><button data-act="add" data-val="r" aria-label="Add right" title="Add right">→</button><span></span><button data-act="add" data-val="b" aria-label="Add below" title="Add below">↓</button><span></span></div>`;
+  else h+=`<p>Select a single node to add children.</p>`;
+  h+=`<h3>Shape</h3><div class="shapes">${SHAPE_LABELS.map(([v,l])=>`<button data-act="shape" data-val="${v}" class="${same('shape')===v?'on':''}">${l}</button>`).join('')}</div>`;
+  h+=`<h3>Diagram shapes</h3><div class="shapes">${DIAGRAM_SHAPES.map(([v,l])=>`<button data-act="shape" data-val="${v}" class="${same('shape')===v?'on':''}">${l}</button>`).join('')}</div>`;
+  h+=`<h3>Fill / accent</h3>${sws('fill',same('fill'),'No fill',false,'fillc')}`;
+  h+=`<h3>Border</h3>${sws('sk',same('sk'),'Automatic',true,'skc')}`;
+  h+=`<h3>Text colour</h3>${seg('tc',[['','Auto'],['muted','Muted'],['#1D1D1F','Dark'],['#FFFFFF','Light']],same('tc')||'')}`;
+  h+=`<h3>Alignment</h3>${seg('al',[['','Centre'],['left','Left']],same('al')||'')}`;
+  h+=`<h3>Text</h3><div class="row"><div class="stepper"><button data-act="size" data-val="-1" aria-label="Smaller">−</button><b>${same('size')||'–'}</b><button data-act="size" data-val="1" aria-label="Larger">+</button></div>${seg('bold',[['1','Bold']],same('bold')?'1':'')}</div>`;
+  if(one&&(n.mw||n.mh))h+=`<div class="btns" style="margin-top:8px"><button class="act" data-act="autosize">Auto-size to text</button></div>`;
+  if(!NOTEXT.has(n.shape)){
+    const ci=same('icon')||'';
+    h+=`<h3>Icon</h3><div class="icons"><button data-act="icon" data-val="" class="${!ci?'on':''}" title="No icon">None</button>${Object.keys(NICONS).map(k=>`<button data-act="icon" data-val="${k}" class="${ci===k?'on':''}" title="${k}" aria-label="${k} icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${NICONS[k]}"/></svg></button>`).join('')}</div>`;
+    const lk=same('link')||'';
+    h+=`<h3>Link</h3><input type="text" data-bind="link" value="${esc(lk)}" placeholder="https://… , email or tel:" aria-label="Link URL">`;
+    if(lk)h+=`<div class="btns" style="margin-top:8px"><button class="act" data-act="lnkopen">Open link ↗</button><button class="act danger" data-act="lnkdel">Remove link</button></div>`;
+    h+=`<p>Click the link badge (or <kbd>Ctrl/⌘</kbd>+click the node) to open. Links stay clickable in SVG and PDF exports.</p>`;
+    h+=`<h3>Image</h3>`;
+    if(one&&n.img)h+=`<img class="imgprev" src="${esc(n.img)}" alt="">${seg('isize',[[90,'S'],[140,'M'],[200,'L'],[280,'XL']],n.iw||140)}<div class="btns" style="margin-top:8px"><button class="act" data-act="imgadd">Replace…</button><button class="act danger" data-act="imgdel">Remove</button></div>`;
+    else if(ns.some(x=>x.img))h+=`<div class="btns"><button class="act" data-act="imgadd">Set image…</button><button class="act danger" data-act="imgdel">Remove images</button></div>`;
+    else h+=`<div class="btns"><button class="act" data-act="imgadd">Add image…</button></div>`;
+    h+=`<p>Or drop an image file onto a node, or paste one with <kbd>Ctrl/⌘</kbd>+<kbd>V</kbd>.</p>`;
+  }
+  h+=`<h3>Actions</h3><div class="btns"><button class="act" data-act="child">Add child (Tab)</button><button class="act" data-act="sib">Add sibling (⇧Enter)</button><button class="act" data-act="connect">Connect to…</button><button class="act" data-act="branch">Select branch</button><button class="act" data-act="dup">Duplicate</button><button class="act danger" data-act="del">Delete</button></div>`;
+  h+=`<p>Tip: hold <kbd>Alt</kbd>/<kbd>⌥</kbd> while dragging to move the whole branch. Drag the corner square to resize.</p>`;
+  return h;
+}
+function edgePanel(e){
+  const [m0,m1]=edgeHeads(e);
+  let h=`<h2>Connector</h2><h3>Label (shown at the midpoint)</h3><input type="text" data-bind="label" value="${esc(e.label||'')}" placeholder="Add a label" aria-label="Connector label">`;
+  h+=`<div class="chips">${['Yes','No','True','False'].map(t=>`<button data-act="elabq" data-val="${t}">${t}</button>`).join('')}<button data-act="elabq" data-val="">Clear</button></div>`;
+  h+=`<h3>Style</h3>${seg('estyle',[['curve','Curve'],['straight','Straight'],['elbow','Elbow']],e.style||'curve')}`;
+  if((e.style||'curve')==='elbow')h+=`<h3>Corners</h3>${seg('ecorner',[['round','Rounded'],['square','Square']],e.corner||'round')}`;
+  h+=`<h3>Colour</h3>${sws('ecolor',e.color,'Automatic',true,'ecolc')}`;
+  h+=`<h3>Thickness</h3>${seg('ewidth',[[1,'1'],[1.5,'1.5'],[2,'2'],[3,'3'],[5,'5'],[8,'8']],e.width||2)}`;
+  h+=`<h3>Line</h3>${seg('edash',[['','Solid'],['dash','Dashed'],['dot','Dotted']],e.dash||'')}`;
+  h+=`<h3>Arrow</h3>${seg('earrow',[['none','None'],['end','End'],['start','Start'],['both','Both']],e.h0==null&&e.h1==null?(e.arrow||'none'):'')}`;
+  h+=`<h3>UML relationship</h3><div class="rels">${RELS.map(([k,l,o])=>`<button data-act="rel" data-val="${k}" class="${m0===o.h0&&m1===o.h1&&(e.dash||'')===o.dash?'on':''}">${relPreview(k,30,14)}${l}</button>`).join('')}</div>`;
+  const opt=cur=>MARKERS.map(([v,l])=>`<option value="${v}"${cur===v?' selected':''}>${l}</option>`).join('');
+  h+=`<h3>Markers</h3><div class="row"><select data-bind="h0" aria-label="Start marker">${opt(m0)}</select><select data-bind="h1" aria-label="End marker">${opt(m1)}</select></div><p>Start · End</p>`;
+  h+=`<h3>End labels (multiplicity)</h3><div class="row"><input type="text" data-bind="l0" value="${esc(e.l0||'')}" placeholder="start e.g. 1" aria-label="Start label"><input type="text" data-bind="l1" value="${esc(e.l1||'')}" placeholder="end e.g. 0..*" aria-label="End label"></div>`;
+  const sd=[['auto','Auto'],['l','Left'],['r','Right'],['t','Top'],['b','Bottom']];
+  h+=`<h3>Starts at (${esc((N(e.from)||{}).text||'').split('\n')[0].slice(0,18)||'node'})</h3>${seg('efa',sd,e.fa||'auto')}`;
+  h+=`<h3>Ends at (${esc((N(e.to)||{}).text||'').split('\n')[0].slice(0,18)||'node'})</h3>${seg('eta',sd,e.ta||'auto')}`;
+  h+=`<h3>Actions</h3><div class="btns"><button class="act" data-act="reverse">Reverse direction</button><button class="act" data-act="straighten">Reset bend</button><button class="act danger" data-act="edel">Delete</button></div>`;
+  h+=`<p>Double-click a connector to type its label. Drag the round handles: ends re-attach to any node, the middle one bends the line.</p>`;
+  return h;
+}
+function canvasPanel(){
+  return`<h2>${esc(doc.title)}</h2><p>${doc.nodes.length} nodes · ${doc.edges.length} connectors</p>
+  <h3>Canvas</h3><div class="btns"><button class="act" data-act="tpl">Templates…</button><button class="act" data-act="fit">Fit to screen</button><button class="act" data-act="transpose">Switch orientation</button><button class="act" data-act="uml">${ui.uml?'Close UML mode':'UML mode'}</button></div>
+  <p><b>Switch orientation</b> turns the diagram between horizontal and vertical (lanes, shapes and connectors).</p>
+  <h3>Build</h3><p>Select a node and use the <b>+</b> handles on its four sides — click to add a node, or drag to connect to an existing node or drop in empty space.</p>
+  <h3>Shortcuts</h3><div class="keys">
+  <span><kbd>Tab</kbd></span><span>Add child (copies sibling style)</span>
+  <span><kbd>Shift</kbd>+<kbd>Enter</kbd></span><span>Add sibling</span>
+  <span><kbd>⌥</kbd>+<kbd>Arrows</kbd></span><span>Add node in a direction</span>
+  <span><kbd>Enter</kbd> / dbl-click</span><span>Rename · label a connector</span>
+  <span><kbd>Shift</kbd>+drag</span><span>Marquee select</span>
+  <span><kbd>Del</kbd></span><span>Delete</span>
+  <span><kbd>Ctrl/⌘</kbd>+<kbd>C V D</kbd></span><span>Copy, paste, duplicate</span>
+  <span><kbd>Ctrl/⌘</kbd>+<kbd>Z</kbd></span><span>Undo (+<kbd>Shift</kbd> redo)</span>
+  <span><kbd>Space</kbd>+drag</span><span>Pan</span>
+  <span><kbd>Ctrl/⌘</kbd>+<kbd>P</kbd></span><span>Print</span></div>`;
+}
+function inspAct(act,v){
+  const ns=[...ui.sel].map(N).filter(Boolean),e=ui.edge?E(ui.edge):null;
+  const done=()=>{commit();refresh();};
+  const setN=p=>{ns.forEach(n=>{Object.assign(n,p);fit(n);});done();};
+  const setE=p=>{if(e){Object.assign(e,p);done();}};
+  switch(act){
+    case'shape':ns.forEach(n=>{n.shape=v;if(v==='class'){if(n.attrs==null)n.attrs='';if(n.ops==null)n.ops='';}fit(n);});done();break;
+    case'fill':setN({fill:v||null});break;
+    case'bf':setN({bf:v||null});break;
+    case'sk':setN({sk:v||null});break;
+    case'tc':setN({tc:v||null});break;
+    case'hd':setN({hd:v});break;
+    case'lw':ns.forEach(n=>{n.mw=Math.max(40,n.w+(+v));fit(n);});done();break;
+    case'lh':ns.forEach(n=>{n.mh=Math.max(30,n.h+(+v));fit(n);});done();break;
+    case'autosize':ns.forEach(n=>{delete n.mw;delete n.mh;fit(n);});done();break;
+    case'size':ns.forEach(n=>{n.size=clamp(n.size+(+v),9,60);fit(n);});done();break;
+    case'bold':setN({bold:!ns[0].bold});break;
+    case'add':if(ns[0])addNodeDir(ns[0],v);break;
+    case'plain':ns.forEach(n=>{delete n.rich;fit(n);});done();break;
+    case'child':if(ns[0])addChildAuto(ns[0]);break;
+    case'sib':if(ns[0])addSibling(ns[0]);break;
+    case'connect':toggleConnect(true,ns[0]&&ns[0].id);break;
+    case'branch':selectBranch();break;
+    case'dup':duplicate();break;
+    case'del':case'edel':deleteSel();break;
+    case'estyle':setE({style:v,bend:{x:0,y:0}});break;
+    case'ecolor':setE({color:v||null});break;
+    case'ewidth':setE({width:+v});break;
+    case'edash':setE({dash:v});break;
+    case'earrow':setE({arrow:v,h0:null,h1:null});break;
+    case'rel':{const r=RELS.find(x=>x[0]===v);if(r)setE({dash:r[2].dash,h0:r[2].h0,h1:r[2].h1});break;}
+    case'elabq':setE({label:v});break;
+    case'efa':setE({fa:v});break;
+    case'eta':setE({ta:v});break;
+    case'reverse':if(e){const[h0,h1]=edgeHeads(e);setE({from:e.to,to:e.from,fa:e.ta||'auto',ta:e.fa||'auto',h0:h1,h1:h0,l0:e.l1||'',l1:e.l0||''});}break;
+    case'straighten':setE({bend:{x:0,y:0}});break;
+    case'ecorner':setE({corner:v});break;
+    case'al':setN({al:v||null});break;
+    case'icon':setN({icon:v||null});break;
+    case'lnkopen':if(ns[0])openLink(ns[0].link);break;
+    case'lnkdel':setN({link:null});break;
+    case'imgadd':imgTargets=ns.map(n=>n.id);$('#imgFile').click();break;
+    case'imgdel':ns.forEach(n=>{delete n.img;delete n.ir;delete n.iw;fit(n);});done();break;
+    case'isize':setN({iw:+v});break;
+    case'transpose':transposeDoc();break;
+    case'uml':setUml(!ui.uml);refresh();break;
+    case'tpl':openTemplates();break;
+    case'fit':fitView();break;
+  }
+}
+/* ---------- links + images ---------- */
+function openLink(u){const s=safeUrl(u);if(s)window.open(s,'_blank','noopener');else toast('That link is not valid');}
+let imgTargets=[];
+function loadImage(file){
+  return new Promise((res,rej)=>{
+    if(!file||!/^image\//.test(file.type))return rej();
+    const url=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{
+      const W=im.naturalWidth||300,H=im.naturalHeight||200,sc=Math.min(1,480/Math.max(W,H));
+      const c=document.createElement('canvas');c.width=Math.max(1,Math.round(W*sc));c.height=Math.max(1,Math.round(H*sc));
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);
+      const alpha=/png|gif|svg|webp/i.test(file.type);
+      res({data:c.toDataURL(alpha?'image/png':'image/jpeg',.86),ir:c.height/c.width});
+    };
+    im.onerror=()=>{URL.revokeObjectURL(url);rej();};
+    im.src=url;
+  });
+}
+async function setImage(ids,file){
+  try{
+    const r=await loadImage(file);
+    ids.forEach(id=>{const n=N(id);if(!n||isCont(n))return;if(NOTEXT.has(n.shape))n.shape='round';n.img=r.data;n.ir=r.ir;n.iw=n.iw||140;fit(n);});
+    commit();refresh();toast('Image added');
+  }catch(_){toast('Could not read that image');}
+}
+$('#imgFile').addEventListener('change',ev=>{const f=ev.target.files[0];if(f&&imgTargets.length)setImage(imgTargets,f);ev.target.value='';});
+insp.addEventListener('click',ev=>{const b=ev.target.closest('[data-act]');if(b)inspAct(b.dataset.act,b.dataset.val);});
+insp.addEventListener('input',ev=>{
+  const t=ev.target,b=t.dataset.bind;if(!b||t.tagName==='SELECT')return;
+  const ns=[...ui.sel].map(N).filter(Boolean),e=ui.edge?E(ui.edge):null;
+  if(b==='text'&&ns[0]){ns[0].text=t.value;delete ns[0].rich;fit(ns[0]);}
+  else if(b==='label'&&e)e.label=t.value;
+  else if((b==='l0'||b==='l1')&&e)e[b]=t.value;
+  else if((b==='stereo'||b==='attrs'||b==='ops')&&ns[0]){ns[0][b]=t.value;fit(ns[0]);}
+  else if(b==='title'&&ns[0]){ns[0].title=t.value;fit(ns[0]);}
+  else if(b==='link')ns.forEach(n=>{n.link=t.value.trim()||null;fit(n);});
+  else if(b==='fillc')ns.forEach(n=>{n.fill=t.value;});
+  else if(b==='bfc')ns.forEach(n=>{n.bf=t.value;});
+  else if(b==='skc')ns.forEach(n=>{n.sk=t.value;});
+  else if(b==='ecolc'&&e)e.color=t.value;
+  render();
+});
+insp.addEventListener('change',ev=>{
+  const b=ev.target.dataset.bind;if(!b)return;
+  if(b==='text'){const n=N([...ui.sel][0]);if(n&&!n.text.trim()&&!isCont(n)){n.text='Idea';fit(n);}}
+  if(b==='link'){const raw=ev.target.value.trim(),u=safeUrl(raw);if(raw&&!u)toast('Only web, email and phone links are allowed');
+    [...ui.sel].map(N).filter(Boolean).forEach(n=>{n.link=u||null;fit(n);});}
+  if((b==='h0'||b==='h1')&&ui.edge){const e=E(ui.edge);if(e){const[m0,m1]=edgeHeads(e);e.h0=m0;e.h1=m1;e[b]=ev.target.value;}}
+  commit();refresh();
+});
+/* =====================================================================
+   Export / print
+   ===================================================================== */
+const LIGHT='svg.mm-export{--canvas:#fff;--ink:#1D1D1F;--muted:#636366;--line:#8E8E93;--node:#fff;--node-stroke:#C7C7CC;--accent:#0066D6;--accent-ink:#fff}';
+function svgString(d,o){
+  o=o||{};const prev=doc;doc={...prev,nodes:d.nodes,edges:d.edges};
+  try{
+    const pad=o.pad==null?40:o.pad,b=bounds(d.nodes),x=b.x-pad,y=b.y-pad,w=b.w+pad*2,h=b.h+pad*2;
+    const cn=d.nodes.filter(isCont).map(n=>nodeSVG(n,false,!o.thumb)).join('');
+    const ed_=d.edges.map(e=>edgeSVG(e,{exp:true})).join(''),nd=d.nodes.filter(n=>!isCont(n)).map(n=>nodeSVG(n,false,!o.thumb)).join('');
+    const size=o.thumb?'width="100%" height="100%"':`width="${w.toFixed(0)}" height="${h.toFixed(0)}"`;
+    return`<svg class="mm-export" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" ${size} font-family='${FONT}'><style>${LIGHT}</style><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#fff"/>${cn}${ed_}${nd}</svg>`;
+  }finally{doc=prev;}
+}
+function download(name,blob){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+}
+const fname=ext=>(doc.title||'mind-map').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').toLowerCase()+'.'+ext;
+function saveJSON(){download(fname('json'),new Blob([JSON.stringify({app:'MindFlow',version:1,title:doc.title,nodes:doc.nodes,edges:doc.edges},null,2)],{type:'application/json'}));toast('Saved JSON');}
+function saveSVG(){download(fname('svg'),new Blob([svgString(doc)],{type:'image/svg+xml'}));}
+function savePNG(){
+  const s=svgString(doc),b=bounds(doc.nodes),w=b.w+80,h=b.h+80,sc=Math.min(2,7000/Math.max(w,h));
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
+    c.toBlob(bl=>{if(bl){download(fname('png'),bl);toast('Exported PNG');}else toast('PNG export failed — try SVG');},'image/png');
+  };
+  img.onerror=()=>toast('PNG export failed — try SVG');
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s);
+}
+function doPrint(){
+  if(ed)commitEdit();
+  const b=bounds(doc.nodes),w=b.w+48,h=b.h+48,land=w>=h,pw=land?277:190,ph=(land?190:277)-8;
+  $('#pageStyle').textContent=`@page{size:A4 ${land?'landscape':'portrait'};margin:10mm}`;
+  const pa=$('#printArea');pa.style.setProperty('--pw',pw+'mm');pa.style.setProperty('--ph',ph+'mm');
+  const vx=b.x-24,vy=b.y-24,sc=Math.min(pw/w,ph/h),ox=(pw-w*sc)/2,oy=(ph-h*sc)/2;
+  const links=doc.nodes.filter(n=>n.link&&safeUrl(n.link)).map(n=>{const u=esc(safeUrl(n.link));
+    return`<a class="plink" href="${u}" target="_blank" rel="noopener" aria-label="${esc(String(n.text||'').split('\n')[0])}" style="left:${(ox+(n.x-n.w/2-vx)*sc).toFixed(2)}mm;top:${(oy+(n.y-n.h/2-vy)*sc).toFixed(2)}mm;width:${(n.w*sc).toFixed(2)}mm;height:${(n.h*sc).toFixed(2)}mm"></a>`;}).join('');
+  pa.innerHTML=`<h1>${esc(doc.title)}</h1><div class="pwrap">`+svgString(doc,{pad:24}).replace(/ width="[\d.]+" height="[\d.]+"/,'')+links+'</div>';
+  setTimeout(()=>window.print(),50);
+}
+window.addEventListener('afterprint',()=>{$('#printArea').innerHTML='';});
+function openFile(){$('#file').click();}
+$('#file').addEventListener('change',ev=>{const f=ev.target.files[0];if(f)readFile(f);ev.target.value='';});
+function readFile(f){
+  const r=new FileReader();
+  r.onload=()=>{try{const o=JSON.parse(r.result);if(!o||!Array.isArray(o.nodes))throw 0;loadData(o);toast('Opened '+f.name);}catch(_){toast('That file is not a MindFlow map');}};
+  r.readAsText(f);
+}
+window.addEventListener('dragover',e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';});
+window.addEventListener('drop',e=>{
+  e.preventDefault();
+  const key=e.dataTransfer.getData('text/x-mindflow-shape');
+  if(key){const r=svg.getBoundingClientRect();if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){const[wx,wy]=wpt(e);addFromLib(key,wx,wy);}return;}
+  const f=e.dataTransfer.files[0];if(!f)return;
+  if(/^image\//.test(f.type)){
+    const[wx,wy]=wpt(e),t=nodeAt(wx,wy,null,true);
+    if(t)setImage([t.id],f);
+    else{const n=mk('Image',snapV(wx),snapV(wy),{});doc.nodes.push(n);ui.sel=new Set([n.id]);ui.edge=null;setImage([n.id],f);}
+    return;
+  }
+  readFile(f);
+});
+let pasteTimer=0;
+document.addEventListener('paste',e=>{
+  const tag=e.target.tagName;if(tag==='INPUT'||tag==='TEXTAREA')return;
+  const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.kind==='file'&&/^image\//.test(i.type));
+  if(it&&ui.sel.size){e.preventDefault();clearTimeout(pasteTimer);setImage([...ui.sel],it.getAsFile());}
+});
+/* =====================================================================
+   Templates dialog, menu, toolbar commands
+   ===================================================================== */
+const tplDlg=$('#tpl');let tplBuilt=false;
+function openTemplates(){
+  if(!tplBuilt){
+    $('#tplGrid').innerHTML=TEMPLATES.map(t=>`<button class="card" data-tpl="${t.id}"><div class="thumb">${svgString(t.build(),{pad:24,thumb:true})}</div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span></button>`).join('')
+      +`<button class="card" data-tpl="blank"><div class="thumb" style="color:#636366;font-size:34px">+</div><b>Blank map</b><span>Start from a single node.</span></button>`;
+    tplBuilt=true;
+  }
+  if(tplDlg.showModal)tplDlg.showModal();else tplDlg.setAttribute('open','');
+}
+tplDlg.addEventListener('click',ev=>{
+  if(ev.target===tplDlg||ev.target.closest('[data-close]')){tplDlg.close();return;}
+  const c=ev.target.closest('[data-tpl]');if(!c)return;
+  if(hist.i>0&&!confirm('Replace the current map? Export it first if you want to keep it.'))return;
+  const id=c.dataset.tpl;
+  loadData(id==='blank'?{title:'Untitled mind map',nodes:[mk('Central idea',0,0,{shape:'pill',fill:'#007AFF',size:22,bold:true})],edges:[]}:TEMPLATES.find(t=>t.id===id).build());
+  tplDlg.close();
+});
+const menu=$('#menu');
+function showMenu(btn){
+  const r=btn.getBoundingClientRect();menu.style.top=(r.bottom+6)+'px';
+  menu.style.left=clamp(r.left,8,innerWidth-250)+'px';menu.classList.add('show');
+}
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('#menu')&&!e.target.closest('[data-cmd=file]'))menu.classList.remove('show');});
+menu.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-m]');if(!b)return;menu.classList.remove('show');
+  switch(b.dataset.m){
+    case'new':if(hist.i>0&&!confirm('Start a new blank map? Export the current one first if you want to keep it.'))return;
+      loadData({title:'Untitled mind map',nodes:[mk('Central idea',0,0,{shape:'pill',fill:'#007AFF',size:22,bold:true})],edges:[]});break;
+    case'open':openFile();break;case'json':saveJSON();break;case'png':savePNG();break;case'svg':saveSVG();break;case'print':doPrint();break;
+  }
+});
+function applyTheme(){
+  const t=ui.theme==='auto'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):ui.theme;
+  document.documentElement.dataset.theme=t;
+}
+matchMedia('(prefers-color-scheme:dark)').addEventListener&&matchMedia('(prefers-color-scheme:dark)').addEventListener('change',applyTheme);
+document.querySelector('.bar').addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-cmd]');if(!b)return;
+  switch(b.dataset.cmd){
+    case'templates':openTemplates();break;
+    case'file':showMenu(b);break;
+    case'undo':undo();break;case'redo':redo();break;
+    case'addnode':{
+      const one=ui.sel.size===1?N([...ui.sel][0]):null;
+      if(one&&!isCont(one))addChildAuto(one);
+      else{const[x,y]=viewCenter();addFreeNode(snapV(x),snapV(y));}
+      break;}
+    case'connect':toggleConnect();break;
+    case'uml':setUml(!ui.uml);refresh();break;
+    case'zoomin':zoomCenter(1.2);break;case'zoomout':zoomCenter(1/1.2);break;case'fit':fitView();break;
+    case'grid':ui.grid=!ui.grid;refresh();break;
+    case'snap':ui.snap=!ui.snap;refresh();toast(ui.snap?'Snap to grid on':'Snap to grid off');break;
+    case'theme':ui.theme={auto:'light',light:'dark',dark:'auto'}[ui.theme];try{localStorage.setItem('mindflow.theme',ui.theme);}catch(_){}applyTheme();syncBar();break;
+    case'print':doPrint();break;
+    case'side':ui.side=!ui.side;syncBar();setTimeout(render,0);break;
+  }
+});
+$('#title').addEventListener('input',e=>{doc.title=e.target.value;document.title=(doc.title||'Mind map')+' — MindFlow';});
+$('#title').addEventListener('change',()=>{commit();renderInspector();});
+$('#title').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur();});
+window.addEventListener('resize',()=>{syncBar();positionEditor();});
+/* ---------- boot ---------- */
+(function init(){
+  try{const t=localStorage.getItem('mindflow.theme');if(t)ui.theme=t;}catch(_){}
+  try{ui.uml=localStorage.getItem('mindflow.uml')==='1';}catch(_){}
+  applyTheme();
+  ui.side=!matchMedia('(max-width:900px)').matches;
+  let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||'null');}catch(_){}
+  if(saved&&Array.isArray(saved.nodes)&&saved.nodes.length){loadData(saved,true);if(!saved.view)fitView();}
+  else{loadData(TEMPLATES[0].build());}
+  if(!(saved&&saved.view))requestAnimationFrame(fitView);
+  syncBar();renderLib();
+})();
+</script>
+</body>
+</html>
