@@ -191,11 +191,6 @@ kbd{font-family:var(--font);background:var(--surface2);border:1px solid var(--se
 .helpbody{padding:18px 22px 24px;overflow:auto;line-height:1.5}
 .helpbody h3{margin:18px 0 8px;font-size:15px}.helpbody h3:first-child{margin-top:0}
 .helpbody .keys{max-width:720px}.helpbody p{color:var(--muted)}
-.outlinebody{padding:18px 20px 20px;display:flex;flex-direction:column;gap:12px;min-height:360px}
-.outlinebody p{margin:0;color:var(--muted);line-height:1.45}
-.outlinebody textarea{width:100%;min-height:300px;resize:vertical;border:1px solid var(--sep);border-radius:12px;background:var(--surface2);color:var(--ink);padding:12px;font:13px/1.55 "Roboto Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.outlineactions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-.outlineactions button{min-width:110px}
 /* Menu + dialog */
 .menu{position:fixed;display:none;min-width:230px;background:var(--surface);border:1px solid var(--sep);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:20}
 .menu.show{display:block}
@@ -264,7 +259,7 @@ dialog::backdrop{background:rgba(0,0,0,.4);-webkit-backdrop-filter:blur(4px);bac
       <button class="tb" data-cmd="connect" id="bConnect" title="Connect two nodes"><i data-i="link"></i><span class="lbl">Connect</span></button>
       <button class="tb" data-cmd="uml" id="bUml" title="UML mode — shape library and UML connectors"><i data-i="shapes"></i><span class="lbl">UML</span></button>
       <button class="tb" data-cmd="autolayout" title="Auto-layout selected branch or whole map"><i data-i="arrange"></i><span class="lbl">Layout</span></button>
-      <button class="tb" data-cmd="paint" id="bPaint" title="Format painter — copy a node style and click targets"><i data-i="paint"></i><span class="lbl">Paint</span></button>
+      <button class="tb" data-cmd="paint" id="bPaint" title="Format painter — copy a node or connector style and click matching targets"><i data-i="paint"></i><span class="lbl">Paint</span></button>
     </div>
     <span class="sepv"></span>
     <div class="grp">
@@ -309,10 +304,8 @@ dialog::backdrop{background:rgba(0,0,0,.4);-webkit-backdrop-filter:blur(4px);bac
 <div class="menu" id="menu" role="menu">
   <button data-m="new"><i data-i="filenew"></i>New blank map</button>
   <button data-m="open"><i data-i="folder"></i>Open JSON…</button>
-  <button data-m="outline-in"><i data-i="file"></i>Import outline / Markdown…</button>
   <hr>
   <button data-m="json"><i data-i="download"></i>Save as JSON</button>
-  <button data-m="outline-out"><i data-i="download"></i>Export Markdown outline…</button>
   <button data-m="png"><i data-i="download"></i>Export PNG (image only)</button>
   <button data-m="pdf"><i data-i="download"></i>Download PDF</button>
   <button data-m="svg"><i data-i="download"></i>Export SVG (clickable links)</button>
@@ -343,22 +336,10 @@ dialog::backdrop{background:rgba(0,0,0,.4);-webkit-backdrop-filter:blur(4px);bac
       <span><kbd>Esc</kbd></span><span>Cancel Connect or Format painter mode</span>
     </div>
     <h3>Arrange</h3><p>Select one node to arrange its branch, select several to arrange their combined branches, or clear the selection to arrange the whole map. The Inspector provides Tree, Org chart, Radial, alignment and distribution commands. Reset layout restores positions and connector routes from before the first layout. Cross-functional lanes are arranged within their own rows or columns. Smart guides appear automatically while dragging.</p>
-    <h3>Branches and objects</h3><p>Selecting one node keeps its whole descendant branch prominent while unrelated nodes fade into the background. Use the coloured ± control above the node’s top-right corner to collapse or expand its descendants. Collapsed branches are remembered in browser auto-save and JSON files. The Inspector can lock positions, group shapes, change stacking order, wrap text to a fixed width and copy formatting with Format painter.</p>
+    <h3>Branches and objects</h3><p>Selecting one node keeps its whole descendant branch prominent while unrelated nodes fade into the background. Use the coloured ± control above the node’s top-right corner to collapse or expand its descendants. Collapsed branches are remembered in browser auto-save and JSON files. The Inspector can lock positions, group shapes, change stacking order, wrap text to a fixed width and copy node or connector formatting with Format painter.</p>
     <h3>UML and diagram shapes</h3><p>UML mode includes flowchart, UML, data-flow, ERD, BPMN, sequence-diagram and swimlane shapes, plus UML and message connectors. Click a shape to add it or drag it onto the canvas.</p>
-    <h3>Connectors</h3><p>Elbow connectors can route around shapes. Add as many bend points as needed, then drag their numbered handles on the canvas; Clear points returns to automatic routing.</p>
-    <h3>Save and export</h3><p>Maps auto-save in this browser. File can build a map from an indented outline or Markdown list and export a map back to Markdown. It also provides JSON, PNG, SVG and a one-click Download all command that saves JSON, PNG and PDF. Print / Save as PDF retains web links.</p>
-  </div>
-</dialog>
-<dialog id="outlineDlg" aria-labelledby="outlineH">
-  <div class="dh"><h2 id="outlineH">Outline / Markdown</h2><button class="tb" data-outline-close aria-label="Close">Done</button></div>
-  <div class="outlinebody">
-    <p id="outlineHelp">Paste an indented outline or Markdown list. Indentation and headings become parent/child branches.</p>
-    <textarea id="outlineText" spellcheck="false" aria-label="Outline or Markdown text" placeholder="# Project launch&#10;- Planning&#10;  - Budget&#10;  - Timeline&#10;- Delivery"></textarea>
-    <div class="outlineactions">
-      <button class="act" id="outlineCopy">Copy</button>
-      <button class="act" id="outlineDownload">Download .md</button>
-      <button class="act pri" id="outlineImport">Build mind map</button>
-    </div>
+    <h3>Connectors</h3><p>Elbow connectors can route around shapes. Add as many bend points as needed, then drag their numbered handles on the canvas; Clear points returns to automatic routing. Format painter copies a connector’s line type, corners, colour, thickness, dash, markers and avoidance setting without changing its label, endpoints or route.</p>
+    <h3>Save and export</h3><p>Maps auto-save in this browser. File provides JSON, PNG, SVG and a one-click Download all command that saves JSON, PNG and PDF. Print / Save as PDF retains web links.</p>
   </div>
 </dialog>
 <div id="printArea"></div>
@@ -1712,9 +1693,27 @@ function ungroupSel(){[...ui.sel].map(N).filter(Boolean).forEach(n=>delete n.gro
 function lockSel(v){const ns=[...ui.sel].map(N).filter(Boolean);if(!ns.length)return;const on=v==null?!ns.every(n=>n.locked):v;ns.forEach(n=>n.locked=on);commit();refresh();toast(on?'Position locked':'Unlocked');}
 function zOrder(how){const ids=new Set(ui.sel);if(!ids.size)return;const pick=doc.nodes.filter(n=>ids.has(n.id)),rest=doc.nodes.filter(n=>!ids.has(n.id));if(how==='front')doc.nodes=[...rest,...pick];else if(how==='back')doc.nodes=[...pick,...rest];else{pick.forEach(n=>{let i=doc.nodes.indexOf(n),j=how==='up'?Math.min(doc.nodes.length-1,i+1):Math.max(0,i-1);doc.nodes.splice(i,1);doc.nodes.splice(j,0,n);});}commit();refresh();}
 const FORMAT_KEYS=[...NODE_STYLE,'bf','wrap','hs','hd'];
-function startPainter(){const n=ui.sel.size===1?N([...ui.sel][0]):null;if(!n){toast('Select one source node first');return;}const o={};FORMAT_KEYS.forEach(k=>{if(n[k]!==undefined)o[k]=n[k];});ui.painter=o;ui.mode='paint';ui.connectFrom=null;toast('Format painter on — click nodes to apply · Esc to stop');refresh();}
+function startPainter(){
+  const e=ui.edge?E(ui.edge):null,n=!e&&ui.sel.size===1?N([...ui.sel][0]):null;
+  if(!n&&!e){toast('Select one source node or connector first');return;}
+  const kind=e?'edge':'node',source=e||n,keys=kind==='edge'?EDGE_STYLE:FORMAT_KEYS,values={};
+  keys.forEach(k=>{if(source[k]!==undefined)values[k]=JSON.parse(JSON.stringify(source[k]));});
+  ui.painter={kind,values};ui.mode='paint';ui.connectFrom=null;
+  toast(`Format painter on — click ${kind==='edge'?'connectors':'nodes'} to apply · Esc to stop`);refresh();
+}
 function stopPainter(){ui.painter=null;if(ui.mode==='paint')ui.mode='select';refresh();}
-function paintNode(n){if(!ui.painter)return;FORMAT_KEYS.forEach(k=>{if(ui.painter[k]===undefined)delete n[k];else n[k]=ui.painter[k];});fit(n);ui.sel=new Set([n.id]);commit();refresh();}
+function paintNode(n){
+  if(!ui.painter)return;
+  if(ui.painter.kind!=='node'){toast('This painter contains connector formatting');return;}
+  FORMAT_KEYS.forEach(k=>{if(ui.painter.values[k]===undefined)delete n[k];else n[k]=JSON.parse(JSON.stringify(ui.painter.values[k]));});
+  fit(n);ui.sel=new Set([n.id]);ui.edge=null;commit();refresh();
+}
+function paintEdge(e){
+  if(!ui.painter)return;
+  if(ui.painter.kind!=='edge'){toast('This painter contains node formatting');return;}
+  EDGE_STYLE.forEach(k=>{if(ui.painter.values[k]===undefined)delete e[k];else e[k]=JSON.parse(JSON.stringify(ui.painter.values[k]));});
+  ui.edge=e.id;ui.sel=new Set();commit();refresh();
+}
 function smartMove(orig,ids,dx,dy){
   if(!ui.smart)return{dx,dy,guides:[]};const moving=new Set(ids),stat=visibleNodes().filter(n=>!moving.has(n.id)&&!isCont(n)),th=7/doc.view.k;let bx=null,by=null;
   const lines=n=>({x:[n.x-n.w/2,n.x,n.x+n.w/2],y:[n.y-n.h/2,n.y,n.y+n.h/2]});
@@ -2159,6 +2158,7 @@ svg.addEventListener('pointerdown',ev=>{
   const ee=t.closest&&t.closest('.edge');
   if(ee){
     const id=ee.dataset.id,key='e'+id;
+    if(ui.mode==='paint'){paintEdge(E(id));return;}
     ui.edge=id;ui.sel=new Set();
     if(lastTap.key===key&&now-lastTap.t<380){lastTap={t:0,key:''};refresh();startEditEdge(id);return;}
     lastTap={t:now,key};refresh();return;
@@ -2531,8 +2531,8 @@ function edgePanel(e){
   h+=`<h3>Starts at (${esc((N(e.from)||{}).text||'').split('\n')[0].slice(0,18)||'node'})</h3>${seg('efa',sd,e.fa||'auto')}`;
   h+=`<h3>Ends at (${esc((N(e.to)||{}).text||'').split('\n')[0].slice(0,18)||'node'})</h3>${seg('eta',sd,e.ta||'auto')}`;
   h+=`<h3>Bend points</h3><div class="btns"><button class="act" data-act="addpoint">Add bend point</button><button class="act" data-act="rmpoint" ${(e.waypoints||[]).length?'':'disabled'}>Remove last</button><button class="act" data-act="clearpoints" ${(e.waypoints||[]).length?'':'disabled'}>Clear points</button></div><p>${(e.waypoints||[]).length} extra point${(e.waypoints||[]).length===1?'':'s'}. Drag the numbered handles on the canvas.</p>`;
-  h+=`<h3>Actions</h3><div class="btns"><button class="act" data-act="reverse">Reverse direction</button><button class="act" data-act="straighten">Reset route</button><button class="act danger" data-act="edel">Delete</button></div>`;
-  h+=`<p>Double-click a connector to type its label. Drag the round end handles to reconnect it. Elbow routing can automatically avoid other shapes.</p>`;
+  h+=`<h3>Actions</h3><div class="btns"><button class="act" data-act="paint">Format painter</button><button class="act" data-act="reverse">Reverse direction</button><button class="act" data-act="straighten">Reset route</button><button class="act danger" data-act="edel">Delete</button></div>`;
+  h+=`<p>Format painter copies line type, corners, colour, thickness, dash, markers and avoidance to other connectors; it keeps each target’s label, endpoints and route. Double-click a connector to type its label. Drag the round end handles to reconnect it.</p>`;
   return h;
 }
 function canvasPanel(){
@@ -2670,89 +2670,6 @@ insp.addEventListener('change',ev=>{
   commit();refresh();
 });
 /* =====================================================================
-   Outline / Markdown import and export
-   ===================================================================== */
-function cleanMarkdownText(s){
-  return String(s||'').trim()
-    .replace(/^\[([ xX])\]\s*/,'')
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g,'$1')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')
-    .replace(/`([^`]+)`/g,'$1')
-    .replace(/\*\*|__|~~/g,'')
-    .replace(/^([*_])(.*)\1$/,'$2')
-    .trim();
-}
-function parseOutline(text){
-  const rows=[];
-  String(text||'').replace(/\r/g,'').split('\n').forEach(line=>{
-    if(!line.trim())return;
-    const lead=(line.match(/^[\t ]*/)||[''])[0],ind=lead.replace(/\t/g,'  ').length,trim=line.trim();
-    const h=trim.match(/^(#{1,6})\s+(.+)$/),li=trim.match(/^(?:[-+*]|\d+[.)])\s+(?:\[[ xX]\]\s*)?(.+)$/);
-    const body=cleanMarkdownText(h?h[2]:li?li[1]:trim.replace(/^>\s*/,''));
-    if(body)rows.push({text:body,depth:h?h[1].length-1:Math.floor(ind/2),heading:!!h,list:!!li});
-  });
-  if(!rows.length)return[];
-  const rootHeading=rows[0].heading&&rows[0].depth===0;
-  if(rootHeading)rows.slice(1).forEach(r=>{if(!r.heading)r.depth+=1;});
-  const min=Math.min(...rows.map(r=>r.depth));
-  const roots=[],stack=[];
-  rows.forEach((r,i)=>{
-    let d=Math.max(0,r.depth-min);if(i===0)d=0;if(d>stack.length)d=stack.length;
-    const item={text:r.text,children:[]};
-    if(d===0)roots.push(item);else stack[d-1].children.push(item);
-    stack[d]=item;stack.length=d+1;
-  });
-  return roots;
-}
-function outlineMap(text){
-  let roots=parseOutline(text);if(!roots.length)throw new Error('empty');
-  if(roots.length>1)roots=[{text:'Imported outline',children:roots}];
-  const nodes=[],edges=[],palette=['#34C759','#AF52DE','#FF9500','#30B0C7','#007AFF','#E45420','#6F42C1'];let leaf=0;
-  function add(item,depth,parent,branch,idx){
-    const col=depth===0?'#0066D6':depth===1?palette[idx%palette.length]:branch;
-    const style=depth===0?{shape:'pill',fill:col,size:22,bold:true}:depth===1?{shape:'round',fill:col,size:16,bold:true}:{shape:'outline',sk:col,size:14};
-    const n=mk(item.text,depth*235,0,style);nodes.push(n);
-    if(parent)edges.push(ln(parent,n,{fa:'r',ta:'l',style:'curve',color:col,width:depth===1?3:2}));
-    if(item.children.length){const ys=item.children.map((c,i)=>add(c,depth+1,n,col,i).y);n.y=(ys[0]+ys[ys.length-1])/2;}
-    else n.y=leaf++*78;
-    return n;
-  }
-  const root=add(roots[0],0,null,'#0066D6',0),shift=root.y;nodes.forEach(n=>n.y-=shift);
-  return{title:(root.text.split('\n')[0]||'Imported outline').slice(0,80),nodes,edges,collapsedBranches:[]};
-}
-function outlineMarkdown(){
-  const semantic=doc.nodes.filter(n=>!isCont(n)&&String(n.text||'').trim()),ids=new Set(semantic.map(n=>n.id));
-  if(!semantic.length)return'';
-  const kids=id=>{
-    const out=[],seen=new Set([id]),q=doc.edges.filter(e=>e.from===id).map(e=>e.to);
-    while(q.length){const x=q.shift();if(seen.has(x))continue;seen.add(x);if(ids.has(x)){out.push(x);continue;}doc.edges.forEach(e=>{if(e.from===x)q.push(e.to);});}
-    return out;
-  };
-  const childMap=new Map(semantic.map(n=>[n.id,kids(n.id)])),incoming=new Set();childMap.forEach(a=>a.forEach(id=>incoming.add(id)));
-  let roots=semantic.filter(n=>!incoming.has(n.id));if(!roots.length)roots=[semantic[0]];
-  const lines=[],used=new Set(),label=n=>String(n.text||'').replace(/\s*\n\s*/g,' / ').trim();
-  function walk(n,depth,heading){if(!n||used.has(n.id))return;used.add(n.id);lines.push(heading?'# '+label(n):'  '.repeat(depth)+'- '+label(n));(childMap.get(n.id)||[]).forEach(id=>walk(N(id),heading?0:depth+1,false));}
-  if(roots.length===1)walk(roots[0],0,true);else roots.forEach(n=>walk(n,0,false));
-  semantic.forEach(n=>{if(!used.has(n.id))walk(n,0,false);});
-  return lines.join('\n')+'\n';
-}
-const outlineDlg=$('#outlineDlg'),outlineText=$('#outlineText');
-function openOutline(mode){
-  outlineDlg.dataset.mode=mode;$('#outlineH').textContent=mode==='import'?'Import outline / Markdown':'Export Markdown outline';
-  $('#outlineHelp').textContent=mode==='import'?'Paste an indented outline, Markdown headings, or a bulleted/numbered list. MindFlow will turn the hierarchy into branches.':'The map has been converted to a Markdown outline. Collapsed branches are included.';
-  $('#outlineImport').style.display=mode==='import'?'':'none';$('#outlineCopy').style.display=mode==='export'?'':'none';$('#outlineDownload').style.display=mode==='export'?'':'none';
-  outlineText.value=mode==='export'?outlineMarkdown():'';
-  if(outlineDlg.showModal)outlineDlg.showModal();else outlineDlg.setAttribute('open','');setTimeout(()=>outlineText.focus(),0);
-}
-outlineDlg.addEventListener('click',e=>{if(e.target===outlineDlg||e.target.closest('[data-outline-close]'))outlineDlg.close();});
-$('#outlineImport').addEventListener('click',()=>{
-  let map;try{map=outlineMap(outlineText.value);}catch(_){toast('Paste an outline or Markdown list first');return;}
-  if(hist.i>0&&!confirm('Replace the current map with this outline? Export the current map first if you want to keep it.'))return;
-  loadData(map);outlineDlg.close();toast(`Built ${map.nodes.length} nodes from the outline`);
-});
-$('#outlineCopy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(outlineText.value);toast('Markdown copied');}catch(_){outlineText.select();document.execCommand('copy');toast('Markdown copied');}});
-$('#outlineDownload').addEventListener('click',()=>{download(fname('md'),new Blob([outlineText.value],{type:'text/markdown;charset=utf-8'}));toast('Downloaded Markdown outline');});
-/* =====================================================================
    Export / print
    ===================================================================== */
 const LIGHT='svg.mm-export{--canvas:#fff;--ink:#1D1D1F;--muted:#636366;--line:#8E8E93;--node:#fff;--node-stroke:#C7C7CC;--accent:#0066D6;--accent-ink:#fff}';
@@ -2873,7 +2790,7 @@ menu.addEventListener('click',ev=>{
   switch(b.dataset.m){
     case'new':if(hist.i>0&&!confirm('Start a new blank map? Export the current one first if you want to keep it.'))return;
       loadData({title:'Untitled mind map',nodes:[mk('Central idea',0,0,{shape:'pill',fill:'#007AFF',size:22,bold:true})],edges:[]});break;
-    case'open':openFile();break;case'outline-in':openOutline('import');break;case'json':saveJSON();break;case'outline-out':openOutline('export');break;case'png':savePNG();break;case'pdf':savePDF();break;case'svg':saveSVG();break;case'all':downloadAll();break;case'print':doPrint();break;
+    case'open':openFile();break;case'json':saveJSON();break;case'png':savePNG();break;case'pdf':savePDF();break;case'svg':saveSVG();break;case'all':downloadAll();break;case'print':doPrint();break;
   }
 });
 const THEMES=[['auto','Auto'],['light','Light'],['dark','Dark'],['ocean','Ocean'],['forest','Forest'],['sunset','Sunset'],['violet','Violet'],['contrast','High contrast']];
