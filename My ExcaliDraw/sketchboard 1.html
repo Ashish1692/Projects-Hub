@@ -1,0 +1,2763 @@
+<!DOCTYPE html>
+<!--
+  Sketchboard — an unofficial, single-file whiteboard inspired by Excalidraw.
+
+  Credits:
+  - Excalidraw (https://github.com/excalidraw/excalidraw), MIT License, Copyright (c) Excalidraw.
+    The UX, hand-drawn look, keyboard shortcuts and .excalidraw file format follow Excalidraw.
+  - Virgil hand-drawn font from the @excalidraw/excalidraw package.
+  - rough.js (MIT), perfect-freehand (MIT), Lucide icons (ISC), Google Fonts (Caveat, Nunito; OFL).
+  Not affiliated with or endorsed by the Excalidraw project.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Sketchboard — a hand-drawn whiteboard (Excalidraw clone)</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20rx%3D%2214%22%20fill%3D%22%236965db%22/%3E%3Cpath%20d%3D%22M13%2047c7-2%2013-1%2019%201s12%202%2019-1%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223.5%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M41%2011l9%209-20%2020-11%203%203-11z%22%20fill%3D%22%23fff%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22/%3E%3Cpath%20d%3D%22M37%2015l9%209%22%20stroke%3D%22%236965db%22%20stroke-width%3D%223%22/%3E%3Cpath%20d%3D%22M22%2033l6%206%22%20stroke%3D%22%236965db%22%20stroke-width%3D%222.5%22/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#6965db" />
+<meta name="description" content="Sketchboard: a hand-drawn style whiteboard inspired by Excalidraw." />
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  @font-face {
+    font-family: 'Virgil';
+    src: url('https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw-assets/Virgil.woff2') format('woff2'),
+         url('https://cdn.jsdelivr.net/npm/@excalidraw/excalidraw@0.17.6/dist/excalidraw-assets/Virgil.woff2') format('woff2');
+    font-display: swap;
+  }
+  :root {
+    --ui-bg: #ffffff; --ui-fg: #1b1b1f; --ui-muted: #7a7a85; --ui-border: #e7e7ee;
+    --ui-hover: #f1f0ff; --accent: #6965db; --accent-soft: #e0dfff;
+    --shadow: 0 0 0 1px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06), 0 6px 20px rgba(0,0,0,.07);
+  }
+  body.dark {
+    --ui-bg: #232329; --ui-fg: #e3e3e8; --ui-muted: #9a9aa5; --ui-border: #34343d;
+    --ui-hover: #2e2d39; --accent: #a8a5ff; --accent-soft: #3d3b66;
+    --shadow: 0 0 0 1px rgba(255,255,255,.05), 0 6px 20px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: Nunito, system-ui, sans-serif; background: #fff; color: var(--ui-fg); }
+  body.dark { background: #121212; }
+  #canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+  body.dark #canvas, body.dark .text-editor, body.dark .lib-item canvas { filter: invert(93%) hue-rotate(180deg); }
+
+  .island { background: var(--ui-bg); color: var(--ui-fg); border-radius: 10px; box-shadow: var(--shadow); }
+  button { font-family: inherit; color: inherit; }
+
+  #toolbar { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 4px; z-index: 20; }
+  .tool { position: relative; width: 36px; height: 36px; border: none; background: transparent; border-radius: 8px; cursor: pointer; display: grid; place-items: center; }
+  .tool:hover { background: var(--ui-hover); }
+  .tool.active { background: var(--accent-soft); color: var(--accent); }
+  .tool svg { width: 17px; height: 17px; stroke-width: 1.8; }
+  .tool .key { position: absolute; right: 3px; bottom: 1px; font-size: 9px; color: var(--ui-muted); }
+  .sep { width: 1px; height: 22px; background: var(--ui-border); margin: 0 4px; }
+
+  #menuBtn { position: fixed; top: 14px; left: 16px; z-index: 20; width: 40px; height: 40px; }
+  #menu { position: fixed; top: 62px; left: 16px; z-index: 30; width: 240px; padding: 6px; display: none; }
+  #menu.open { display: block; }
+  .menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: none; border-radius: 6px; cursor: pointer; font-size: 13px; text-align: left; }
+  .menu-item:hover { background: var(--ui-hover); }
+  .menu-item svg { width: 16px; height: 16px; }
+  .menu-item .sc { margin-left: auto; color: var(--ui-muted); font-size: 11px; }
+  .menu-sep { height: 1px; background: var(--ui-border); margin: 6px 4px; }
+
+  #props { position: fixed; top: 70px; left: 16px; width: 214px; padding: 10px 12px 12px; z-index: 15; max-height: calc(100vh - 140px); overflow-y: auto; font-size: 12px; }
+  #props[hidden] { display: none; }
+  .prop-title { font-size: 11px; color: var(--ui-muted); margin: 10px 0 6px; font-weight: 600; display: flex; justify-content: space-between; }
+  .prop-title:first-child { margin-top: 2px; }
+  .row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .slider-row { margin-top: 6px; flex-wrap: nowrap; gap: 8px; }
+  .slider-row .val { min-width: 28px; text-align: right; font-weight: 700; color: var(--ui-fg); }
+  .opt { width: 30px; height: 30px; border-radius: 7px; border: 1px solid transparent; background: var(--ui-hover); cursor: pointer; display: grid; place-items: center; padding: 0; font-size: 12px; font-weight: 700; }
+  .opt:hover { border-color: var(--ui-border); }
+  .opt.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .opt svg { width: 18px; height: 18px; }
+  .swatch { width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(0,0,0,.12); cursor: pointer; padding: 0; position: relative; }
+  .swatch.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .swatch.transparent, .checker { background-image: linear-gradient(45deg,#ddd 25%,transparent 25%,transparent 75%,#ddd 75%), linear-gradient(45deg,#ddd 25%,#fff 25%,#fff 75%,#ddd 75%); background-size: 8px 8px; background-position: 0 0, 4px 4px; }
+  .swatch.custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+  .vsep { width: 1px; height: 18px; background: var(--ui-border); margin: 0 3px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+
+  #footer { position: fixed; bottom: 16px; left: 16px; display: flex; gap: 10px; z-index: 20; }
+  .group { display: flex; align-items: center; padding: 3px; gap: 2px; }
+  .group .tool { width: 32px; height: 32px; }
+  .group .tool:disabled { opacity: .35; cursor: default; background: none; }
+  #zoomLabel { min-width: 52px; border: none; background: none; cursor: pointer; font-size: 12px; font-weight: 600; height: 32px; border-radius: 6px; }
+  #zoomLabel:hover { background: var(--ui-hover); }
+  #helpBtn { position: fixed; bottom: 16px; right: 16px; z-index: 20; width: 38px; height: 38px; }
+
+  /* Library */
+  #libBtn { position: fixed; top: 14px; right: 16px; z-index: 20; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border: none; cursor: pointer; font-weight: 700; font-size: 13px; }
+  #libBtn svg { width: 17px; height: 17px; }
+  #libBtn.active { color: var(--accent); }
+  #library { position: fixed; top: 64px; right: 16px; bottom: 66px; width: 290px; z-index: 25; display: none; flex-direction: column; padding: 12px; }
+  #library.open { display: flex; }
+  .lib-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 15px; }
+  .lib-head .row .tool { width: 30px; height: 30px; }
+  .lib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; overflow-y: auto; margin-top: 12px; align-content: start; flex: 1; padding: 2px; }
+  .lib-item { position: relative; height: 96px; border: 1px solid var(--ui-border); border-radius: 8px; display: grid; place-items: center; cursor: grab; background: #fff; overflow: hidden; }
+  body.dark .lib-item { background: #121212; }
+  .lib-item:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .lib-item .del { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px; border: none; background: var(--ui-bg); box-shadow: var(--shadow); cursor: pointer; display: none; place-items: center; padding: 0; }
+  .lib-item .del svg { width: 13px; height: 13px; }
+  .lib-item:hover .del { display: grid; }
+  .lib-empty { color: var(--ui-muted); font-size: 13px; text-align: center; padding: 18px 8px; grid-column: 1 / -1; }
+  #addLibBtn { justify-content: center; }
+  #addLibBtn:disabled { opacity: .45; cursor: default; }
+
+  #welcome { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 1; text-align: center; color: #b0b0bb; }
+  #welcome h1 { font-family: Virgil, Caveat, cursive; font-weight: 400; font-size: 46px; margin: 0 0 6px; color: var(--accent); opacity: .85; }
+  #welcome p { margin: 4px 0; font-size: 14px; }
+  #welcome .hints { font-family: Virgil, Caveat, cursive; font-size: 18px; margin-top: 18px; color: #a0a0ad; }
+  #welcome[hidden] { display: none; }
+
+  .text-editor { position: fixed; z-index: 5; margin: 0; padding: 0; border: none; outline: none; background: transparent; resize: none; overflow: hidden; white-space: pre; transform-origin: 0 0; word-break: normal; }
+
+  .backdrop { position: fixed; inset: 0; background: rgba(15,15,25,.35); z-index: 50; display: none; place-items: center; }
+  .backdrop.open { display: grid; }
+  .modal { width: min(660px, 92vw); max-height: 86vh; overflow: auto; padding: 22px 24px; position: relative; }
+  .modal h2 { margin: 0 0 14px; font-size: 20px; }
+  .close-x { position: absolute; top: 12px; right: 12px; }
+  .preview { border-radius: 8px; border: 1px solid var(--ui-border); height: 240px; display: grid; place-items: center; overflow: hidden; margin-bottom: 14px; }
+  .preview canvas { max-width: 100%; max-height: 236px; }
+  .export-opts { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: 13px; margin-bottom: 16px; }
+  .export-opts label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .btn { border: none; background: var(--accent); color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
+  body.dark .btn { color: #16161a; }
+  .btn.secondary { background: var(--ui-hover); color: var(--ui-fg); }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 28px; font-size: 13px; }
+  .shortcuts div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--ui-border); }
+  kbd { background: var(--ui-hover); border-radius: 4px; padding: 1px 6px; font-family: inherit; font-size: 12px; border: 1px solid var(--ui-border); white-space: nowrap; }
+  #toast { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); padding: 10px 16px; font-size: 13px; z-index: 60; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #welcome .credit { margin-top: 14px; font-size: 12px; color: #a0a0ad; pointer-events: auto; }
+  #welcome .credit a, .about a { color: var(--accent); text-decoration: none; font-weight: 700; }
+  #welcome .credit a:hover, .about a:hover { text-decoration: underline; }
+  .about { font-size: 14px; line-height: 1.55; }
+  .about ul { padding-left: 20px; margin: 8px 0 14px; }
+  .about .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .about .brand img { width: 44px; height: 44px; }
+  .about .muted { color: var(--ui-muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="welcome">
+  <div>
+    <h1>Sketchboard</h1>
+    <p>All your data is saved locally in your browser.</p>
+    <div class="hints">Pick a tool &amp; start drawing! · Double-click a shape or arrow to add text · Press ? for help</div>
+    <div class="credit">Inspired by <a href="https://github.com/excalidraw/excalidraw" target="_blank" rel="noopener">Excalidraw</a> · <a href="#" data-action="about">Credits</a></div>
+  </div>
+</div>
+
+<button id="menuBtn" class="tool island" title="Menu"><i data-lucide="menu"></i></button>
+<div id="menu" class="island">
+  <button class="menu-item" data-action="open"><i data-lucide="folder-open"></i>Open<span class="sc">Ctrl+O</span></button>
+  <button class="menu-item" data-action="save"><i data-lucide="download"></i>Save to file<span class="sc">Ctrl+S</span></button>
+  <button class="menu-item" data-action="export"><i data-lucide="image"></i>Export image…<span class="sc">Ctrl+Shift+E</span></button>
+  <button class="menu-item" data-action="insertImage"><i data-lucide="image-plus"></i>Insert image…<span class="sc">9</span></button>
+  <button class="menu-item" data-action="reset"><i data-lucide="trash-2"></i>Reset the canvas</button>
+  <div class="menu-sep"></div>
+  <button class="menu-item" data-action="library"><i data-lucide="library"></i>Library</button>
+  <button class="menu-item" data-action="grid"><i data-lucide="grid-3x3"></i>Toggle grid<span class="sc">Ctrl+'</span></button>
+  <button class="menu-item" data-action="theme"><i data-lucide="moon"></i><span id="themeLabel">Dark mode</span><span class="sc">Alt+Shift+D</span></button>
+  <button class="menu-item" data-action="help"><i data-lucide="help-circle"></i>Help &amp; shortcuts<span class="sc">?</span></button>
+  <button class="menu-item" data-action="about"><i data-lucide="heart"></i>About &amp; credits</button>
+</div>
+
+<div id="toolbar" class="island"></div>
+<div id="props" class="island" hidden></div>
+
+<button id="libBtn" class="island" data-action="library" title="Shape library"><i data-lucide="library"></i><span>Library</span></button>
+<aside id="library" class="island">
+  <div class="lib-head">
+    <strong>Library</strong>
+    <div class="row">
+      <button class="tool" data-action="importLibrary" title="Import .excalidrawlib"><i data-lucide="upload"></i></button>
+      <button class="tool" data-action="exportLibrary" title="Export library"><i data-lucide="download"></i></button>
+      <button class="tool" data-action="resetLibrary" title="Restore default items"><i data-lucide="rotate-ccw"></i></button>
+      <button class="tool" data-action="library" title="Close"><i data-lucide="x"></i></button>
+    </div>
+  </div>
+  <button class="btn" id="addLibBtn" data-action="addToLibrary"><i data-lucide="plus"></i>Add selection to library</button>
+  <div id="libItems" class="lib-grid"></div>
+</aside>
+
+<div id="footer">
+  <div class="group island">
+    <button class="tool" data-action="zoomOut" title="Zoom out (Ctrl -)"><i data-lucide="minus"></i></button>
+    <button id="zoomLabel" data-action="zoomReset" title="Reset zoom">100%</button>
+    <button class="tool" data-action="zoomIn" title="Zoom in (Ctrl +)"><i data-lucide="plus"></i></button>
+  </div>
+  <div class="group island">
+    <button class="tool" id="undoBtn" data-action="undo" title="Undo (Ctrl Z)"><i data-lucide="undo-2"></i></button>
+    <button class="tool" id="redoBtn" data-action="redo" title="Redo (Ctrl Shift Z)"><i data-lucide="redo-2"></i></button>
+  </div>
+</div>
+<button id="helpBtn" class="tool island" data-action="help" title="Help (?)"><i data-lucide="help-circle"></i></button>
+
+<div class="backdrop" id="exportModal">
+  <div class="modal island">
+    <button class="tool close-x" data-close><i data-lucide="x"></i></button>
+    <h2>Export image</h2>
+    <div class="preview checker" id="exportPreview"></div>
+    <div class="export-opts">
+      <label><input type="checkbox" id="expBg" checked /> Background</label>
+      <label><input type="checkbox" id="expDark" /> Dark mode</label>
+      <label id="expSelWrap"><input type="checkbox" id="expSel" /> Only selected</label>
+      <label>Scale
+        <select id="expScale"><option value="1">1×</option><option value="2" selected>2×</option><option value="3">3×</option></select>
+      </label>
+    </div>
+    <div class="btn-row">
+      <button class="btn" data-action="exportPng"><i data-lucide="file-image"></i>PNG</button>
+      <button class="btn" data-action="exportSvg"><i data-lucide="file-code-2"></i>SVG</button>
+      <button class="btn secondary" data-action="copyPng"><i data-lucide="clipboard-copy"></i>Copy to clipboard</button>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="helpModal">
+  <div class="modal island">
+    <button class="tool close-x" data-close><i data-lucide="x"></i></button>
+    <h2>Keyboard shortcuts</h2>
+    <div class="shortcuts">
+      <div><span>Hand (pan)</span><kbd>H</kbd></div>
+      <div><span>Selection</span><kbd>V / 1</kbd></div>
+      <div><span>Rectangle</span><kbd>R / 2</kbd></div>
+      <div><span>Diamond</span><kbd>D / 3</kbd></div>
+      <div><span>Ellipse</span><kbd>O / 4</kbd></div>
+      <div><span>Arrow</span><kbd>A / 5</kbd></div>
+      <div><span>Line</span><kbd>L / 6</kbd></div>
+      <div><span>Draw</span><kbd>P / 7</kbd></div>
+      <div><span>Text</span><kbd>T / 8</kbd></div>
+      <div><span>Insert image</span><kbd>9</kbd></div>
+      <div><span>Eraser</span><kbd>E / 0</kbd></div>
+      <div><span>Frame</span><kbd>F</kbd></div>
+      <div><span>Text inside shape</span><kbd>Double-click / Enter</kbd></div>
+      <div><span>Label on arrow / line</span><kbd>Double-click</kbd></div>
+      <div><span>Elbow arrow (routes around shapes)</span><kbd>Arrow type ▸ Elbow</kbd></div>
+      <div><span>Rename frame</span><kbd>Double-click name</kbd></div>
+      <div><span>Lock tool</span><kbd>Q</kbd></div>
+      <div><span>Pan</span><kbd>Space + drag</kbd></div>
+      <div><span>Undo / Redo</span><kbd>Ctrl Z / Ctrl Shift Z</kbd></div>
+      <div><span>Duplicate</span><kbd>Ctrl D / Alt + drag</kbd></div>
+      <div><span>Group / Ungroup</span><kbd>Ctrl G / Ctrl Shift G</kbd></div>
+      <div><span>Select all</span><kbd>Ctrl A</kbd></div>
+      <div><span>Copy / Cut / Paste</span><kbd>Ctrl C / X / V</kbd></div>
+      <div><span>Bring forward / back</span><kbd>Ctrl ] / Ctrl [</kbd></div>
+      <div><span>To front / back</span><kbd>Ctrl Shift ] / [</kbd></div>
+      <div><span>Zoom in / out / reset</span><kbd>Ctrl + / - / 0</kbd></div>
+      <div><span>Zoom to fit</span><kbd>Shift 1</kbd></div>
+      <div><span>Toggle grid</span><kbd>Ctrl '</kbd></div>
+      <div><span>Constrain / snap angle</span><kbd>Shift</kbd></div>
+      <div><span>Draw from center</span><kbd>Alt</kbd></div>
+      <div><span>Dark mode</span><kbd>Alt Shift D</kbd></div>
+    </div>
+    <p style="font-size:13px;color:var(--ui-muted);margin:14px 0 0">Arrows snap to shapes when you start or end them on a shape, and follow when the shape moves. Drop images or <code>.excalidraw</code> / <code>.excalidrawlib</code> files anywhere on the canvas. Choose <b>Arrow type ▸ Elbow</b> for right-angled arrows that automatically route around shapes.</p>
+    <p style="font-size:12.5px;color:var(--ui-muted);margin:10px 0 0">Sketchboard is inspired by <a href="https://github.com/excalidraw/excalidraw" target="_blank" rel="noopener" style="color:var(--accent)">Excalidraw</a> (MIT). <a href="#" data-action="about" style="color:var(--accent)">See all credits</a>.</p>
+  </div>
+</div>
+
+<div class="backdrop" id="aboutModal">
+  <div class="modal island about">
+    <button class="tool close-x" data-close><i data-lucide="x"></i></button>
+    <div class="brand"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20rx%3D%2214%22%20fill%3D%22%236965db%22/%3E%3Cpath%20d%3D%22M13%2047c7-2%2013-1%2019%201s12%202%2019-1%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223.5%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M41%2011l9%209-20%2020-11%203%203-11z%22%20fill%3D%22%23fff%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22/%3E%3Cpath%20d%3D%22M37%2015l9%209%22%20stroke%3D%22%236965db%22%20stroke-width%3D%223%22/%3E%3Cpath%20d%3D%22M22%2033l6%206%22%20stroke%3D%22%236965db%22%20stroke-width%3D%222.5%22/%3E%3C/svg%3E" alt="" /><div><h2 style="margin:0">Sketchboard</h2><div class="muted">A hand-drawn whiteboard in a single HTML file</div></div></div>
+    <p>Sketchboard is an unofficial clone built as a tribute to <a href="https://excalidraw.com" target="_blank" rel="noopener">Excalidraw</a>, the open-source virtual whiteboard for sketching hand-drawn-like diagrams. Its look and feel, keyboard shortcuts, element model and <code>.excalidraw</code> / <code>.excalidrawlib</code> file formats follow Excalidraw so your drawings can move between the two.</p>
+    <p><b>Huge thanks to the Excalidraw team and contributors.</b> If you like this, please use and support the original: <a href="https://github.com/excalidraw/excalidraw" target="_blank" rel="noopener">github.com/excalidraw/excalidraw</a>.</p>
+    <b>Credits &amp; licences</b>
+    <ul>
+      <li><a href="https://github.com/excalidraw/excalidraw" target="_blank" rel="noopener">Excalidraw</a> — design &amp; file format inspiration (MIT License, © Excalidraw)</li>
+      <li>Virgil hand-drawn font — from the <a href="https://www.npmjs.com/package/@excalidraw/excalidraw" target="_blank" rel="noopener">@excalidraw/excalidraw</a> package</li>
+      <li><a href="https://roughjs.com" target="_blank" rel="noopener">rough.js</a> — sketchy rendering (MIT)</li>
+      <li><a href="https://github.com/steveruizok/perfect-freehand" target="_blank" rel="noopener">perfect-freehand</a> — pen strokes (MIT)</li>
+      <li><a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> — icons (ISC)</li>
+      <li><a href="https://fonts.google.com" target="_blank" rel="noopener">Google Fonts</a> — Caveat &amp; Nunito (OFL)</li>
+    </ul>
+    <p class="muted">Sketchboard is not affiliated with, endorsed by, or sponsored by the Excalidraw project. “Excalidraw” is used here only to give credit.</p>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".excalidraw,.json,.excalidrawlib,application/json" hidden />
+<input type="file" id="imageInput" accept="image/*" hidden />
+<input type="file" id="libInput" accept=".excalidrawlib,.json" hidden />
+<div id="toast" class="island"></div>
+
+<script type="module">
+import rough from 'https://esm.sh/roughjs@4.6.6';
+import { getStroke } from 'https://esm.sh/perfect-freehand@1.2.2';
+
+/* ============================================================
+   Constants
+   ============================================================ */
+const FONTS = {
+  1: 'Virgil, Caveat, "Segoe Print", "Comic Sans MS", cursive',
+  2: 'Nunito, Helvetica, Arial, sans-serif',
+  3: '"Cascadia Code", "Cascadia Mono", Consolas, "Courier New", monospace',
+};
+const LINE_H = 1.25;
+const SEL = '#6965db';
+const GRID = 20;
+const STORAGE_KEY = 'sketchboard-scene-v1';
+const LIB_KEY = 'sketchboard-library-v1';
+const STROKES = ['#1e1e1e', '#e03131', '#2f9e44', '#1971c2', '#f08c00'];
+const BGS = ['transparent', '#ffc9c9', '#b2f2bb', '#a5d8ff', '#ffec99'];
+const CONTAINERS = ['rectangle', 'diamond', 'ellipse'];
+const BINDABLE = ['rectangle', 'diamond', 'ellipse', 'text', 'image'];
+const ELEMENT_TYPES = ['rectangle', 'diamond', 'ellipse', 'line', 'arrow', 'freedraw', 'text', 'image', 'frame', 'magicframe'];
+const BOUND_PAD = 5;
+const LABEL_MAX_W = 220;
+const BIND_GAP = 6;
+const TOOLS = [
+  { id: 'hand', icon: 'hand', key: '', title: 'Hand (panning) — H' },
+  { id: 'selection', icon: 'mouse-pointer-2', key: '1', title: 'Selection — V or 1' },
+  { id: 'rectangle', icon: 'square', key: '2', title: 'Rectangle — R or 2' },
+  { id: 'diamond', icon: 'diamond', key: '3', title: 'Diamond — D or 3' },
+  { id: 'ellipse', icon: 'circle', key: '4', title: 'Ellipse — O or 4' },
+  { id: 'arrow', icon: 'move-right', key: '5', title: 'Arrow — A or 5' },
+  { id: 'line', icon: 'minus', key: '6', title: 'Line — L or 6' },
+  { id: 'freedraw', icon: 'pencil', key: '7', title: 'Draw — P or 7' },
+  { id: 'text', icon: 'type', key: '8', title: 'Text — T or 8' },
+  { id: 'image', icon: 'image-plus', key: '9', title: 'Insert image — 9' },
+  { id: 'eraser', icon: 'eraser', key: '0', title: 'Eraser — E or 0' },
+  { id: 'frame', icon: 'frame', key: 'F', title: 'Frame — F' },
+];
+const KEYMAP = { h: 'hand', v: 'selection', 1: 'selection', r: 'rectangle', 2: 'rectangle', d: 'diamond', 3: 'diamond',
+  o: 'ellipse', 4: 'ellipse', a: 'arrow', 5: 'arrow', l: 'line', 6: 'line', p: 'freedraw', 7: 'freedraw', t: 'text', 8: 'text',
+  9: 'image', e: 'eraser', 0: 'eraser', f: 'frame' };
+
+const PROPS_BY_TYPE = {
+  rectangle: ['strokeColor', 'backgroundColor', 'fillStyle', 'strokeWidth', 'strokeStyle', 'roughness', 'roundness', 'opacity'],
+  diamond: ['strokeColor', 'backgroundColor', 'fillStyle', 'strokeWidth', 'strokeStyle', 'roughness', 'opacity'],
+  ellipse: ['strokeColor', 'backgroundColor', 'fillStyle', 'strokeWidth', 'strokeStyle', 'roughness', 'opacity'],
+  line: ['strokeColor', 'strokeWidth', 'strokeStyle', 'roughness', 'roundness', 'opacity'],
+  arrow: ['strokeColor', 'strokeWidth', 'strokeStyle', 'roughness', 'arrowType', 'startArrowhead', 'endArrowhead', 'opacity'],
+  freedraw: ['strokeColor', 'strokeWidth', 'opacity'],
+  text: ['strokeColor', 'fontSize', 'fontFamily', 'textAlign', 'opacity'],
+  image: ['opacity'],
+  frame: [],
+};
+const applies = (type, prop) => (PROPS_BY_TYPE[type] || []).includes(prop);
+
+/* ============================================================
+   State
+   ============================================================ */
+const $ = (s) => document.querySelector(s);
+const canvas = $('#canvas');
+const ctx = canvas.getContext('2d');
+const rc = rough.canvas(canvas);
+const gen = rough.generator();
+const measureCtx = document.createElement('canvas').getContext('2d');
+let dpr = window.devicePixelRatio || 1;
+
+const state = {
+  elements: [],
+  files: {},
+  library: [],
+  selected: new Set(),
+  tool: 'selection',
+  locked: false,
+  view: { x: 0, y: 0, zoom: 1 },
+  style: {
+    strokeColor: '#1e1e1e', backgroundColor: 'transparent', fillStyle: 'hachure', strokeWidth: 2,
+    strokeStyle: 'solid', roughness: 1, roundness: 'round', opacity: 100, fontSize: 20, fontFamily: 1,
+    textAlign: 'left', startArrowhead: null, endArrowhead: 'arrow', arrowType: 'curved',
+  },
+  theme: 'light',
+  grid: false,
+  space: false,
+  editor: null,
+  bindHint: null,
+};
+let action = null;
+let lastPointer = { x: 0, y: 0 };
+
+/* ============================================================
+   Utilities & geometry
+   ============================================================ */
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const newSeed = () => Math.floor(Math.random() * 2 ** 31);
+const isLinear = (el) => !!el && (el.type === 'line' || el.type === 'arrow');
+const byId = (id) => state.elements.find((e) => e.id === id);
+const selectedEls = () => state.elements.filter((e) => state.selected.has(e.id));
+const clone = (o) => JSON.parse(JSON.stringify(o, (k, v) => (k[0] === '_' ? undefined : v)));
+const bump = (el) => { el.version = (el.version || 0) + 1; el.versionNonce = newSeed(); };
+const snap = (v) => (state.grid ? Math.round(v / GRID) * GRID : v);
+const snapPt = (p) => ({ x: snap(p.x), y: snap(p.y) });
+const viewCenter = () => toWorld(innerWidth / 2, innerHeight / 2);
+
+function toWorld(sx, sy) { const v = state.view; return { x: sx / v.zoom - v.x, y: sy / v.zoom - v.y }; }
+function toScreen(wx, wy) { const v = state.view; return { x: (wx + v.x) * v.zoom, y: (wy + v.y) * v.zoom }; }
+
+function rotPt(x, y, cx, cy, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c];
+}
+function localBox(el) {
+  if (el.points) {
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const [px, py] of el.points) {
+      x1 = Math.min(x1, el.x + px); y1 = Math.min(y1, el.y + py);
+      x2 = Math.max(x2, el.x + px); y2 = Math.max(y2, el.y + py);
+    }
+    return [x1, y1, x2, y2];
+  }
+  return [Math.min(el.x, el.x + el.width), Math.min(el.y, el.y + el.height), Math.max(el.x, el.x + el.width), Math.max(el.y, el.y + el.height)];
+}
+function center(el) { const b = localBox(el); return [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]; }
+function getBounds(el) {
+  const b = localBox(el);
+  if (!el.angle) return b;
+  const [cx, cy] = center(el);
+  let pts;
+  if (el.points) pts = el.points.map(([px, py]) => [el.x + px, el.y + py]);
+  else if (el.type === 'ellipse') {
+    const rx = (b[2] - b[0]) / 2, ry = (b[3] - b[1]) / 2;
+    pts = Array.from({ length: 36 }, (_, i) => [cx + rx * Math.cos(i * Math.PI / 18), cy + ry * Math.sin(i * Math.PI / 18)]);
+  } else pts = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const [x, y] of pts) {
+    const [rx, ry] = rotPt(x, y, cx, cy, el.angle);
+    x1 = Math.min(x1, rx); y1 = Math.min(y1, ry); x2 = Math.max(x2, rx); y2 = Math.max(y2, ry);
+  }
+  return [x1, y1, x2, y2];
+}
+function commonBounds(els) {
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const el of els) { const b = getBounds(el); x1 = Math.min(x1, b[0]); y1 = Math.min(y1, b[1]); x2 = Math.max(x2, b[2]); y2 = Math.max(y2, b[3]); }
+  return [x1, y1, x2, y2];
+}
+function exportBounds(els) {
+  const b = commonBounds(els);
+  if (els.some((e) => e.type === 'frame')) for (const f of els) if (f.type === 'frame') b[1] = Math.min(b[1], localBox(f)[1] - 24);
+  return b;
+}
+function fixRotation(el, c0) {
+  if (!el.angle) return;
+  const c1 = center(el), c = Math.cos(el.angle), s = Math.sin(el.angle);
+  const dx = c0[0] - c1[0], dy = c0[1] - c1[1];
+  el.x += dx - (c * dx - s * dy);
+  el.y += dy - (s * dx + c * dy);
+}
+function worldPoints(el) {
+  const [cx, cy] = center(el);
+  return el.points.map(([px, py]) => (el.angle ? rotPt(el.x + px, el.y + py, cx, cy, el.angle) : [el.x + px, el.y + py]));
+}
+function toLocal(el, x, y) { if (!el.angle) return [x, y]; const [cx, cy] = center(el); return rotPt(x, y, cx, cy, -el.angle); }
+function fromLocal(el, x, y) { if (!el.angle) return [x, y]; const [cx, cy] = center(el); return rotPt(x, y, cx, cy, el.angle); }
+function distSeg(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
+  let t = l ? ((px - ax) * dx + (py - ay) * dy) / l : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+}
+function distPoly(px, py, pts, closed) {
+  let d = Infinity;
+  const n = pts.length;
+  for (let i = 0; i < n - (closed ? 0 : 1); i++) { const a = pts[i], b = pts[(i + 1) % n]; d = Math.min(d, distSeg(px, py, a[0], a[1], b[0], b[1])); }
+  return d;
+}
+function inPoly(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+// Outline of a closed shape in its local (unrotated) coordinates
+function outlineLocal(el) {
+  const [x1, y1, x2, y2] = localBox(el);
+  if (el.type === 'ellipse') return { ellipse: [(x1 + x2) / 2, (y1 + y2) / 2, Math.max((x2 - x1) / 2, 0.5), Math.max((y2 - y1) / 2, 0.5)] };
+  if (el.type === 'diamond') { const mx = (x1 + x2) / 2, my = (y1 + y2) / 2; return { poly: [[mx, y1], [x2, my], [mx, y2], [x1, my]] }; }
+  return { poly: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]] };
+}
+function insideLocal(el, x, y, margin = 0) {
+  const o = outlineLocal(el);
+  if (o.ellipse) {
+    const [cx, cy, rx, ry] = o.ellipse;
+    const d = Math.hypot((x - cx) / rx, (y - cy) / ry);
+    return d <= 1 || (d - 1) * Math.min(rx, ry) <= margin;
+  }
+  return inPoly(x, y, o.poly) || (margin > 0 && distPoly(x, y, o.poly, true) <= margin);
+}
+// First parameter t in [0,1] where segment R→T crosses the outline
+function rayHit(el, R, T) {
+  const o = outlineLocal(el);
+  const dx = T[0] - R[0], dy = T[1] - R[1];
+  if (o.ellipse) {
+    const [cx, cy, rx, ry] = o.ellipse, ox = R[0] - cx, oy = R[1] - cy;
+    const a = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+    const b = 2 * ((ox * dx) / (rx * rx) + (oy * dy) / (ry * ry));
+    const c = (ox * ox) / (rx * rx) + (oy * oy) / (ry * ry) - 1;
+    const disc = b * b - 4 * a * c;
+    if (a < 1e-9 || disc < 0) return null;
+    const t = (-b - Math.sqrt(disc)) / (2 * a);
+    return t >= 0 && t <= 1 ? t : null;
+  }
+  let best = null;
+  const n = o.poly.length;
+  for (let i = 0; i < n; i++) {
+    const [ax, ay] = o.poly[i], [bx, by] = o.poly[(i + 1) % n];
+    const ex = bx - ax, ey = by - ay, den = dx * ey - dy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((ax - R[0]) * ey - (ay - R[1]) * ex) / den;
+    const u = ((ax - R[0]) * dy - (ay - R[1]) * dx) / den;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && (best === null || t < best)) best = t;
+  }
+  return best;
+}
+
+/* ============================================================
+   Text measuring & wrapping
+   ============================================================ */
+const fontStr = (el, z = 1) => `${el.fontSize * z}px ${FONTS[el.fontFamily] || FONTS[1]}`;
+function measureText(el) {
+  measureCtx.font = fontStr(el);
+  const lines = (el.text || '').split('\n');
+  let w = 0;
+  for (const l of lines) w = Math.max(w, measureCtx.measureText(l).width);
+  el.width = Math.max(w, 2);
+  el.height = lines.length * el.fontSize * LINE_H;
+}
+function wrapText(text, font, maxW) {
+  measureCtx.font = font;
+  const W = (s) => measureCtx.measureText(s).width;
+  const out = [];
+  for (const para of text.split('\n')) {
+    let line = '';
+    for (const word of para.split(' ')) {
+      const cand = line ? line + ' ' + word : word;
+      if (W(cand) <= maxW) { line = cand; continue; }
+      if (line) out.push(line);
+      let w = word;
+      while (W(w) > maxW && w.length > 1) {
+        let i = 1;
+        while (i < w.length && W(w.slice(0, i + 1)) <= maxW) i++;
+        out.push(w.slice(0, i));
+        w = w.slice(i);
+      }
+      line = w;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+/* ============================================================
+   Arrow binding
+   ============================================================ */
+function focusLocal(t, b) {
+  const [x1, y1, x2, y2] = localBox(t);
+  let p = [x1 + b.fx * (x2 - x1), y1 + b.fy * (y2 - y1)];
+  if (!insideLocal(t, p[0], p[1], 0.5)) p = [(x1 + x2) / 2, (y1 + y2) / 2];
+  return p;
+}
+function focusWorld(t, b) { const p = focusLocal(t, b); return fromLocal(t, p[0], p[1]); }
+function bindPoint(t, b, ref) {
+  const T = focusLocal(t, b);
+  const R = toLocal(t, ref[0], ref[1]);
+  if (insideLocal(t, R[0], R[1])) return fromLocal(t, T[0], T[1]);
+  const tt = rayHit(t, R, T);
+  if (tt === null) return fromLocal(t, T[0], T[1]);
+  const dx = T[0] - R[0], dy = T[1] - R[1], len = Math.hypot(dx, dy) || 1;
+  const d = Math.max(0, tt * len - BIND_GAP - (t.strokeWidth || 0) / 2);
+  return fromLocal(t, R[0] + (dx / len) * d, R[1] + (dy / len) * d);
+}
+function makeBinding(t, p) {
+  const [x1, y1, x2, y2] = localBox(t);
+  const [lx, ly] = toLocal(t, p.x, p.y);
+  const w = Math.max(x2 - x1, 1e-6), h = Math.max(y2 - y1, 1e-6);
+  return { elementId: t.id, fx: Math.min(1, Math.max(0, (lx - x1) / w)), fy: Math.min(1, Math.max(0, (ly - y1) / h)) };
+}
+function findBindTarget(p) {
+  const m = 12 / state.view.zoom;
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (!BINDABLE.includes(el.type) || el.containerId || el._editing) continue;
+    const [lx, ly] = toLocal(el, p.x, p.y);
+    if (insideLocal(el, lx, ly, m)) return el;
+  }
+  return null;
+}
+function syncArrow(a, map) {
+  const s = a.startBinding && map.get(a.startBinding.elementId);
+  const e = a.endBinding && map.get(a.endBinding.elementId);
+  if (a.startBinding && !s) a.startBinding = null;
+  if (a.endBinding && !e) a.endBinding = null;
+  if (!s && !e) return;
+  const wp = worldPoints(a), n = wp.length;
+  if (n < 2) return;
+  const refS = n > 2 ? wp[1] : e ? focusWorld(e, a.endBinding) : wp[n - 1];
+  const refE = n > 2 ? wp[n - 2] : s ? focusWorld(s, a.startBinding) : wp[0];
+  if (s) wp[0] = bindPoint(s, a.startBinding, refS);
+  if (e) wp[n - 1] = bindPoint(e, a.endBinding, refE);
+  const [ox, oy] = wp[0];
+  const pts = wp.map(([x, y]) => [x - ox, y - oy]);
+  const changed = a.angle || Math.abs(a.x - ox) > 0.01 || Math.abs(a.y - oy) > 0.01 ||
+    pts.some((p, i) => Math.abs(p[0] - a.points[i][0]) > 0.01 || Math.abs(p[1] - a.points[i][1]) > 0.01);
+  if (!changed) return;
+  a.x = ox; a.y = oy; a.angle = 0; a.points = pts;
+  const [x1, y1, x2, y2] = localBox(a);
+  a.width = x2 - x1; a.height = y2 - y1;
+  bump(a);
+}
+
+/* ============================================================
+   Elbow arrows: orthogonal routing around shapes (A* on a sparse grid)
+   ============================================================ */
+const ROUTE_PAD = 22;          // clearance kept around obstacles
+const BEND_COST = 60;          // penalty per turn (favours clean routes)
+const MAX_OBSTACLES = 60;
+const OBSTACLE_TYPES = ['rectangle', 'diamond', 'ellipse', 'image', 'text'];
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]]; // 0 right, 1 left, 2 down, 3 up
+const OPP = [1, 0, 3, 2];
+const dirOf = (dx, dy) => (Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 0 : 1) : (dy >= 0 ? 2 : 3));
+
+// Choose the side of a bound shape the arrow leaves from / enters into
+function elbowSide(t, b, other) {
+  const [x1, y1, x2, y2] = getBounds(t), cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+  const w = Math.max(x2 - x1, 1), h = Math.max(y2 - y1, 1);
+  const nearCenter = Math.abs(b.fx - 0.5) < 0.25 && Math.abs(b.fy - 0.5) < 0.25;
+  let dir;
+  if (nearCenter || t.angle) {
+    const dx = other[0] - cx, dy = other[1] - cy;
+    dir = Math.abs(dx) * h >= Math.abs(dy) * w ? (dx >= 0 ? 0 : 1) : (dy >= 0 ? 2 : 3);
+  } else {
+    const d = [1 - b.fx, b.fx, 1 - b.fy, b.fy];
+    dir = d.indexOf(Math.min(...d));
+  }
+  const offset = BIND_GAP + (t.strokeWidth || 0) / 2;
+  const alongRect = !t.angle && ['rectangle', 'image', 'text'].includes(t.type);
+  const fy = alongRect ? y1 + Math.min(0.9, Math.max(0.1, b.fy)) * h : cy;
+  const fx = alongRect ? x1 + Math.min(0.9, Math.max(0.1, b.fx)) * w : cx;
+  const P = [[x2 + offset, fy], [x1 - offset, fy], [fx, y2 + offset], [fx, y1 - offset]][dir];
+  const Q = [[x2 + ROUTE_PAD, fy], [x1 - ROUTE_PAD, fy], [fx, y2 + ROUTE_PAD], [fx, y1 - ROUTE_PAD]][dir];
+  return { dir, P, Q };
+}
+function simplifyOrtho(pts) {
+  const out = [];
+  for (const p of pts) {
+    const last = out[out.length - 1];
+    if (last && Math.abs(last[0] - p[0]) < 0.01 && Math.abs(last[1] - p[1]) < 0.01) continue;
+    if (out.length >= 2) {
+      const a = out[out.length - 2], b = last;
+      const colX = Math.abs(a[0] - b[0]) < 0.01 && Math.abs(b[0] - p[0]) < 0.01;
+      const colY = Math.abs(a[1] - b[1]) < 0.01 && Math.abs(b[1] - p[1]) < 0.01;
+      if (colX || colY) { out[out.length - 1] = p; continue; }
+    }
+    out.push(p);
+  }
+  return out;
+}
+// Simple Z/L route used when no clean path exists
+function fallbackRoute(S, sd, E, ed) {
+  const horiz = sd >= 0 ? sd < 2 : ed >= 0 ? ed < 2 : Math.abs(E[0] - S[0]) >= Math.abs(E[1] - S[1]);
+  if (horiz) { const mx = (S[0] + E[0]) / 2; return [S, [mx, S[1]], [mx, E[1]], E]; }
+  const my = (S[1] + E[1]) / 2;
+  return [S, [S[0], my], [E[0], my], E];
+}
+class MinHeap {
+  constructor() { this.a = []; }
+  push(k, v) { const a = this.a; a.push([k, v]); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (a[p][0] <= a[i][0]) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } }
+  pop() {
+    const a = this.a, top = a[0], last = a.pop();
+    if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && a[l][0] < a[m][0]) m = l; if (r < a.length && a[r][0] < a[m][0]) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } }
+    return top;
+  }
+  get size() { return this.a.length; }
+}
+// A* over the grid formed by obstacle edges + endpoints. sd = required first direction, ed = required arrival direction (-1 = any)
+function findOrthoPath(S, sd, E, ed, boxes) {
+  const strictlyIn = (x, y) => boxes.some((b) => x > b[0] + 0.01 && x < b[2] - 0.01 && y > b[1] + 0.01 && y < b[3] - 0.01);
+  let minX = Math.min(S[0], E[0]), maxX = Math.max(S[0], E[0]), minY = Math.min(S[1], E[1]), maxY = Math.max(S[1], E[1]);
+  for (const b of boxes) { minX = Math.min(minX, b[0]); minY = Math.min(minY, b[1]); maxX = Math.max(maxX, b[2]); maxY = Math.max(maxY, b[3]); }
+  const xsSet = new Set([S[0], E[0], (S[0] + E[0]) / 2, minX - ROUTE_PAD, maxX + ROUTE_PAD]);
+  const ysSet = new Set([S[1], E[1], (S[1] + E[1]) / 2, minY - ROUTE_PAD, maxY + ROUTE_PAD]);
+  for (const b of boxes) { xsSet.add(b[0]); xsSet.add(b[2]); ysSet.add(b[1]); ysSet.add(b[3]); }
+  const round = (v) => Math.round(v * 100) / 100;
+  const xs = [...new Set([...xsSet].map(round))].sort((a, b) => a - b);
+  const ys = [...new Set([...ysSet].map(round))].sort((a, b) => a - b);
+  const NX = xs.length, NY = ys.length;
+  const si = xs.indexOf(round(S[0])), sj = ys.indexOf(round(S[1]));
+  const ei = xs.indexOf(round(E[0])), ej = ys.indexOf(round(E[1]));
+  if (si < 0 || sj < 0 || ei < 0 || ej < 0) return null;
+  const blocked = new Uint8Array(NX * NY);
+  for (let i = 0; i < NX; i++) for (let j = 0; j < NY; j++) blocked[j * NX + i] = strictlyIn(xs[i], ys[j]) ? 1 : 0;
+  if (blocked[sj * NX + si] || blocked[ej * NX + ei]) return null;
+  const edgeOk = (i, j, ni, nj) => !blocked[nj * NX + ni] && !strictlyIn((xs[i] + xs[ni]) / 2, (ys[j] + ys[nj]) / 2);
+  const H = (i, j) => Math.abs(xs[i] - xs[ei]) + Math.abs(ys[j] - ys[ej]);
+  const key = (i, j, d) => ((j * NX + i) << 2) | d;
+  const dist = new Map(), prev = new Map(), heap = new MinHeap();
+  const startD = sd >= 0 ? sd : 4; // 4 = no direction yet
+  const k0 = ((sj * NX + si) << 3) | startD;
+  dist.set(k0, 0); heap.push(H(si, sj), [si, sj, startD, 0]);
+  let best = null, bestCost = Infinity;
+  let guard = 0;
+  while (heap.size && guard++ < 60000) {
+    const [f, [i, j, d, g]] = heap.pop();
+    if (f >= bestCost) break;
+    const kk = ((j * NX + i) << 3) | d;
+    if (g > (dist.get(kk) ?? Infinity)) continue;
+    if (i === ei && j === ej) {
+      const total = g + (ed >= 0 && d !== ed ? (d === OPP[ed] ? 1e6 : BEND_COST) : 0);
+      if (total < bestCost) { bestCost = total; best = kk; }
+      continue;
+    }
+    for (let nd = 0; nd < 4; nd++) {
+      if (d < 4 && nd === OPP[d]) continue;
+      const ni = i + (nd === 0 ? 1 : nd === 1 ? -1 : 0), nj = j + (nd === 2 ? 1 : nd === 3 ? -1 : 0);
+      if (ni < 0 || nj < 0 || ni >= NX || nj >= NY || !edgeOk(i, j, ni, nj)) continue;
+      const ng = g + Math.abs(xs[ni] - xs[i]) + Math.abs(ys[nj] - ys[j]) + (d < 4 && nd !== d ? BEND_COST : 0);
+      const nk = ((nj * NX + ni) << 3) | nd;
+      if (ng < (dist.get(nk) ?? Infinity)) { dist.set(nk, ng); prev.set(nk, kk); heap.push(ng + H(ni, nj), [ni, nj, nd, ng]); }
+    }
+  }
+  if (best === null) return null;
+  const path = [];
+  for (let k = best; k !== undefined; k = prev.get(k)) { const n = k >> 3; path.push([xs[n % NX], ys[Math.floor(n / NX)]]); }
+  return path.reverse();
+}
+function routeElbow(a, map, els) {
+  const s = a.startBinding && map.get(a.startBinding.elementId);
+  const e = a.endBinding && map.get(a.endBinding.elementId);
+  if (a.startBinding && !s) a.startBinding = null;
+  if (a.endBinding && !e) a.endBinding = null;
+  const wp = worldPoints(a);
+  if (wp.length < 2) return;
+  const rawS = wp[0], rawE = wp[wp.length - 1];
+  const cOf = (t) => { const b = getBounds(t); return [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]; };
+  const sInfo = s ? elbowSide(s, a.startBinding, e ? cOf(e) : rawE) : null;
+  const eInfo = e ? elbowSide(e, a.endBinding, s ? cOf(s) : rawS) : null;
+  const S = sInfo ? sInfo.P : rawS, E = eInfo ? eInfo.P : rawE;
+  const S1 = sInfo ? sInfo.Q : rawS, E1 = eInfo ? eInfo.Q : rawE;
+  const sd = sInfo ? sInfo.dir : -1, ed = eInfo ? OPP[eInfo.dir] : -1;
+
+  // Obstacles: nearby shapes (padded boxes), skipping any that swallow a free endpoint
+  const rx1 = Math.min(S1[0], E1[0]) - 300, ry1 = Math.min(S1[1], E1[1]) - 300;
+  const rx2 = Math.max(S1[0], E1[0]) + 300, ry2 = Math.max(S1[1], E1[1]) + 300;
+  const inside = (b, p) => p[0] > b[0] + 0.01 && p[0] < b[2] - 0.01 && p[1] > b[1] + 0.01 && p[1] < b[3] - 0.01;
+  const boxes = [];
+  for (const o of els) {
+    if (!OBSTACLE_TYPES.includes(o.type) || o.containerId || o._editing || o.id === a.id) continue;
+    const g = getBounds(o);
+    if (g[2] < rx1 || g[0] > rx2 || g[3] < ry1 || g[1] > ry2) continue;
+    const b = [g[0] - ROUTE_PAD, g[1] - ROUTE_PAD, g[2] + ROUTE_PAD, g[3] + ROUTE_PAD];
+    const own = o === s || o === e;
+    if (!own && (inside(b, S1) || inside(b, E1))) continue;
+    boxes.push(b);
+    if (boxes.length >= MAX_OBSTACLES) break;
+  }
+  const key = [S, E, S1, E1, sd, ed, boxes].flat(2).map((v) => Math.round(v)).join(',');
+  if (a._rk === key && a.points.length >= 2) return;
+  a._rk = key;
+  let mid = findOrthoPath(S1, sd, E1, ed, boxes);
+  if (!mid) mid = fallbackRoute(S1, sd, E1, ed);
+  // If an endpoint is free, make the first/last leg orthogonal
+  const pts = simplifyOrtho([S, ...mid, E].map((p) => [p[0], p[1]]));
+  const fixed = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const p = fixed[fixed.length - 1], q = pts[i];
+    if (Math.abs(p[0] - q[0]) > 0.01 && Math.abs(p[1] - q[1]) > 0.01) fixed.push([q[0], p[1]]);
+    fixed.push(q);
+  }
+  const out = simplifyOrtho(fixed);
+  if (out.length < 2) out.push([out[0][0] + 1, out[0][1]]);
+  const [ox, oy] = out[0];
+  a.x = ox; a.y = oy; a.angle = 0;
+  a.points = out.map(([x, y]) => [x - ox, y - oy]);
+  const [x1, y1, x2, y2] = localBox(a);
+  a.width = x2 - x1; a.height = y2 - y1;
+  bump(a);
+}
+// Point halfway along a polyline (used to place labels on elbow arrows)
+function polylineMid(wp) {
+  let total = 0;
+  for (let i = 1; i < wp.length; i++) total += Math.hypot(wp[i][0] - wp[i - 1][0], wp[i][1] - wp[i - 1][1]);
+  let half = total / 2;
+  for (let i = 1; i < wp.length; i++) {
+    const l = Math.hypot(wp[i][0] - wp[i - 1][0], wp[i][1] - wp[i - 1][1]);
+    if (half <= l && l > 0) { const t = half / l; return [wp[i - 1][0] + (wp[i][0] - wp[i - 1][0]) * t, wp[i - 1][1] + (wp[i][1] - wp[i - 1][1]) * t]; }
+    half -= l;
+  }
+  return wp[wp.length - 1];
+}
+
+/* ============================================================
+   Bound text (text in shapes, labels on arrows/lines)
+   ============================================================ */
+const containerK = (c) => (c.type === 'ellipse' ? Math.SQRT1_2 : c.type === 'diamond' ? 0.5 : 1);
+function boundMaxWidth(c) {
+  if (isLinear(c)) return LABEL_MAX_W;
+  return Math.max(Math.abs(c.width) * containerK(c) - BOUND_PAD * 2, 12);
+}
+function labelPoint(el) {
+  const wp = worldPoints(el), n = wp.length;
+  if (el.elbowed) return polylineMid(wp);
+  if (n % 2 === 1) return wp[(n - 1) / 2];
+  const a = wp[n / 2 - 1], b = wp[n / 2];
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+}
+function layoutBoundText(t, c) {
+  const maxW = boundMaxWidth(c);
+  const key = `${t.originalText}|${t.fontSize}|${t.fontFamily}|${maxW.toFixed(2)}`;
+  if (t._wk !== key) {
+    t.text = wrapText(t.originalText ?? '', fontStr(t), maxW);
+    measureText(t);
+    t._wk = key;
+  }
+  t.frameId = c.frameId || null;
+  if (isLinear(c)) {
+    const [px, py] = labelPoint(c);
+    t.x = px - t.width / 2; t.y = py - t.height / 2; t.angle = 0;
+    return;
+  }
+  const needH = (t.height + BOUND_PAD * 2) / containerK(c);
+  if (Math.abs(c.height) < needH - 0.5) {
+    const c0 = center(c);
+    c.height = Math.sign(c.height || 1) * needH;
+    fixRotation(c, c0);
+    bump(c);
+  }
+  const [cx, cy] = center(c);
+  t.x = cx - t.width / 2; t.y = cy - t.height / 2; t.angle = c.angle || 0;
+}
+// Recompute everything derived from other elements: bound text layout, arrow endpoints, labels.
+function syncDerived(els = state.elements) {
+  const map = new Map(els.map((e) => [e.id, e]));
+  for (const t of els) if (t.containerId) { const c = map.get(t.containerId); if (c && !isLinear(c)) layoutBoundText(t, c); }
+  for (const a of els) {
+    if (a.type !== 'arrow') continue;
+    if (a.elbowed) routeElbow(a, map, els);
+    else if (a.startBinding || a.endBinding) syncArrow(a, map);
+  }
+  for (const t of els) if (t.containerId) { const c = map.get(t.containerId); if (c && isLinear(c)) layoutBoundText(t, c); }
+}
+function cleanup(els = state.elements) {
+  const map = new Map(els.map((e) => [e.id, e]));
+  for (const el of els) {
+    if (el.boundTextId && map.get(el.boundTextId)?.containerId !== el.id) el.boundTextId = null;
+    if (el.frameId && map.get(el.frameId)?.type !== 'frame') el.frameId = null;
+    if (el.startBinding && !map.has(el.startBinding.elementId)) el.startBinding = null;
+    if (el.endBinding && !map.has(el.endBinding.elementId)) el.endBinding = null;
+    if (el.containerId && !map.has(el.containerId)) el.containerId = null;
+  }
+}
+
+/* ============================================================
+   Element factory
+   ============================================================ */
+function createElement(type, p) {
+  const s = state.style;
+  const el = {
+    id: uid(), type, x: p.x, y: p.y, width: 0, height: 0, angle: 0,
+    strokeColor: s.strokeColor, backgroundColor: s.backgroundColor, fillStyle: s.fillStyle,
+    strokeWidth: s.strokeWidth, strokeStyle: s.strokeStyle, roughness: s.roughness, opacity: s.opacity,
+    groupIds: [], frameId: null, roundness: null, seed: newSeed(), version: 1, versionNonce: newSeed(),
+  };
+  if (type === 'rectangle') el.roundness = s.roundness === 'round' ? { type: 3 } : null;
+  if (isLinear(el)) {
+    el.points = [[0, 0], [0, 0]];
+    el.roundness = s.roundness === 'round' ? { type: 2 } : null;
+    if (type === 'arrow') {
+      el.startArrowhead = s.startArrowhead; el.endArrowhead = s.endArrowhead; el.startBinding = null; el.endBinding = null;
+      el.elbowed = s.arrowType === 'elbow';
+      el.roundness = s.arrowType === 'curved' ? { type: 2 } : null;
+    }
+  }
+  if (type === 'freedraw') { el.points = [[0, 0]]; el.pressures = []; el.simulatePressure = true; }
+  if (type === 'text') { Object.assign(el, { text: '', originalText: '', containerId: null, fontSize: s.fontSize, fontFamily: s.fontFamily, textAlign: s.textAlign }); measureText(el); }
+  if (type === 'frame') {
+    const n = state.elements.filter((e) => e.type === 'frame').length + 1;
+    Object.assign(el, { name: `Frame ${n}`, strokeColor: '#bbb', backgroundColor: 'transparent', opacity: 100 });
+  }
+  if (type === 'image') Object.assign(el, { fileId: null, strokeColor: 'transparent', backgroundColor: 'transparent' });
+  return el;
+}
+function createBoundText(c) {
+  const t = createElement('text', { x: 0, y: 0 });
+  Object.assign(t, { containerId: c.id, textAlign: 'center', strokeColor: c.strokeColor && c.strokeColor !== 'transparent' ? c.strokeColor : state.style.strokeColor, frameId: c.frameId || null });
+  const i = state.elements.indexOf(c);
+  state.elements.splice(i + 1, 0, t);
+  c.boundTextId = t.id;
+  syncDerived();
+  return t;
+}
+
+/* ============================================================
+   Shape generation (rough.js + perfect-freehand), cached per version
+   ============================================================ */
+const shapeCache = new Map();
+function getShape(el) {
+  const hit = shapeCache.get(el.id);
+  if (hit && hit.v === el.versionNonce) return hit.s;
+  const s = buildShape(el);
+  shapeCache.set(el.id, { v: el.versionNonce, s });
+  return s;
+}
+function roughOpts(el, withFill = true) {
+  const o = { seed: el.seed, stroke: el.strokeColor, strokeWidth: el.strokeWidth, roughness: el.roughness, bowing: 1 };
+  if (el.strokeStyle === 'dashed') { o.strokeLineDash = [8, 8 + el.strokeWidth]; o.disableMultiStroke = true; o.strokeWidth += 0.5; }
+  else if (el.strokeStyle === 'dotted') { o.strokeLineDash = [1.5, 6 + el.strokeWidth]; o.disableMultiStroke = true; o.strokeWidth += 0.5; }
+  if (withFill && el.backgroundColor && el.backgroundColor !== 'transparent') {
+    o.fill = el.backgroundColor; o.fillStyle = el.fillStyle; o.fillWeight = Math.max(0.5, el.strokeWidth / 2); o.hachureGap = Math.max(4, el.strokeWidth * 4);
+  }
+  return o;
+}
+function roundRectPath(x, y, w, h, r) {
+  return `M ${x + r} ${y} L ${x + w - r} ${y} Q ${x + w} ${y}, ${x + w} ${y + r} L ${x + w} ${y + h - r} Q ${x + w} ${y + h}, ${x + w - r} ${y + h} L ${x + r} ${y + h} Q ${x} ${y + h}, ${x} ${y + h - r} L ${x} ${y + r} Q ${x} ${y}, ${x + r} ${y}`;
+}
+function arrowHead(el, pts, atStart) {
+  if (pts.length < 2) return [];
+  const type = atStart ? el.startArrowhead : el.endArrowhead;
+  const [x2, y2] = atStart ? pts[0] : pts[pts.length - 1];
+  const [x1, y1] = atStart ? pts[1] : pts[pts.length - 2];
+  const dist = Math.hypot(x2 - x1, y2 - y1);
+  if (dist < 1) return [];
+  const o = { ...roughOpts(el, false), strokeLineDash: undefined, disableMultiStroke: false };
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  const len = Math.min(dist * 0.5, (type === 'arrow' ? 22 : 14) + el.strokeWidth * 2);
+  if (type === 'dot') return [gen.circle(x2, y2, len * 0.8, { ...o, fill: el.strokeColor, fillStyle: 'solid' })];
+  const spread = type === 'arrow' ? Math.PI / 8 : Math.PI / 7;
+  const p3 = [x2 - len * Math.cos(ang - spread), y2 - len * Math.sin(ang - spread)];
+  const p4 = [x2 - len * Math.cos(ang + spread), y2 - len * Math.sin(ang + spread)];
+  if (type === 'triangle') return [gen.polygon([[x2, y2], p3, p4], { ...o, fill: el.strokeColor, fillStyle: 'solid' })];
+  return [gen.linearPath([p3, [x2, y2], p4], o)];
+}
+function svgPathFromStroke(points) {
+  if (!points.length) return '';
+  const d = points.reduce((acc, [x0, y0], i, arr) => {
+    const [x1, y1] = arr[(i + 1) % arr.length];
+    acc.push(x0.toFixed(2), y0.toFixed(2), ((x0 + x1) / 2).toFixed(2), ((y0 + y1) / 2).toFixed(2));
+    return acc;
+  }, ['M', points[0][0].toFixed(2), points[0][1].toFixed(2), 'Q']);
+  d.push('Z');
+  return d.join(' ');
+}
+function buildShape(el) {
+  const o = roughOpts(el);
+  const W = el.width, H = el.height;
+  const x = Math.min(0, W), y = Math.min(0, H), w = Math.abs(W), h = Math.abs(H);
+  switch (el.type) {
+    case 'rectangle': {
+      if (el.roundness) { const m = Math.min(w, h), r = m <= 128 ? m * 0.25 : 32; return [gen.path(roundRectPath(x, y, w, h, r), o)]; }
+      return [gen.rectangle(x, y, w, h, o)];
+    }
+    case 'diamond':
+      return [gen.polygon([[x + w / 2, y], [x + w, y + h / 2], [x + w / 2, y + h], [x, y + h / 2]], o)];
+    case 'ellipse':
+      return [gen.ellipse(W / 2, H / 2, w, h, o)];
+    case 'line':
+    case 'arrow': {
+      const pts = el.points.map((p) => [p[0], p[1]]);
+      const lo = roughOpts(el, false);
+      const out = [pts.length > 2 && el.roundness && !el.elbowed ? gen.curve(pts, lo) : gen.linearPath(pts, lo)];
+      if (el.type === 'arrow') {
+        if (el.startArrowhead) out.push(...arrowHead(el, pts, true));
+        if (el.endArrowhead) out.push(...arrowHead(el, pts, false));
+      }
+      return out;
+    }
+    case 'freedraw': {
+      const input = el.simulatePressure || !el.pressures?.length
+        ? el.points.map((p) => [p[0], p[1]])
+        : el.points.map((p, i) => [p[0], p[1], el.pressures[i] ?? 0.5]);
+      const stroke = getStroke(input, {
+        size: el.strokeWidth * 4.25, thinning: 0.6, smoothing: 0.5, streamline: 0.5,
+        easing: (t) => Math.sin((t * Math.PI) / 2), simulatePressure: el.simulatePressure !== false, last: true,
+      });
+      const d = svgPathFromStroke(stroke);
+      return { free: true, d, path: new Path2D(d) };
+    }
+  }
+  return [];
+}
+
+/* ============================================================
+   Images
+   ============================================================ */
+const imageCache = new Map();
+function getImage(fileId) {
+  if (!fileId) return null;
+  let img = imageCache.get(fileId);
+  if (img) return img;
+  const f = state.files[fileId];
+  if (!f) return null;
+  img = new Image();
+  img.onload = () => { requestRender(); };
+  img.src = f.dataURL;
+  imageCache.set(fileId, img);
+  return img;
+}
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+function drawText(c, el) {
+  c.font = fontStr(el);
+  c.fillStyle = el.strokeColor;
+  c.textBaseline = 'top';
+  const lead = ((LINE_H - 1) * el.fontSize) / 2;
+  (el.text || '').split('\n').forEach((line, i) => {
+    const lw = c.measureText(line).width;
+    const x = el.textAlign === 'center' ? (el.width - lw) / 2 : el.textAlign === 'right' ? el.width - lw : 0;
+    c.fillText(line, x, i * el.fontSize * LINE_H + lead);
+  });
+}
+function drawElement(c, r, el, exporting = false, label = null, parentFaded = false) {
+  if (el._editing && !exporting) return;
+  c.save();
+  const faded = !exporting && (el._erasing || parentFaded);
+  c.globalAlpha = (el.opacity / 100) * (faded ? 0.25 : 1);
+  if (label && (label.originalText || '').trim()) {
+    // Cut a hole in the connector where its label sits
+    const b = getBounds(el);
+    c.beginPath();
+    c.rect(b[0] - 200, b[1] - 200, b[2] - b[0] + 400, b[3] - b[1] + 400);
+    c.rect(label.x - 5, label.y - 3, label.width + 10, label.height + 6);
+    c.clip('evenodd');
+  }
+  if (el.angle) { const [cx, cy] = center(el); c.translate(cx, cy); c.rotate(el.angle); c.translate(-cx, -cy); }
+  c.translate(el.x, el.y);
+  if (el.type === 'text') drawText(c, el);
+  else if (el.type === 'image') {
+    const img = getImage(el.fileId);
+    const x = Math.min(0, el.width), y = Math.min(0, el.height), w = Math.abs(el.width), h = Math.abs(el.height);
+    if (img && img.complete && img.naturalWidth) c.drawImage(img, x, y, w, h);
+    else { c.fillStyle = '#f1f1f4'; c.fillRect(x, y, w, h); c.strokeStyle = '#c8c8d0'; c.strokeRect(x, y, w, h); }
+  } else {
+    const s = getShape(el);
+    if (s.free) { c.fillStyle = el.strokeColor; c.fill(s.path); }
+    else s.forEach((d) => r.draw(d));
+  }
+  c.restore();
+}
+function frameNameRect(f, zoom) {
+  const fs = 14 / zoom;
+  measureCtx.font = `600 ${fs}px Nunito, sans-serif`;
+  const [x1, y1, x2] = localBox(f);
+  const w = Math.min(measureCtx.measureText(f.name || 'Frame').width + 2 / zoom, Math.max(x2 - x1, 40 / zoom));
+  return [x1, y1 - fs * 1.4 - 3 / zoom, w, fs * 1.4];
+}
+function drawFrame(c, f, zoom, exporting) {
+  const [x1, y1, x2, y2] = localBox(f);
+  c.save();
+  c.globalAlpha = !exporting && f._erasing ? 0.3 : 1;
+  c.lineWidth = 1 / zoom;
+  c.strokeStyle = '#a5a5b0';
+  c.beginPath();
+  const r = Math.min(8 / zoom, (x2 - x1) / 2, (y2 - y1) / 2);
+  if (c.roundRect && r > 0) c.roundRect(x1, y1, x2 - x1, y2 - y1, r); else c.rect(x1, y1, x2 - x1, y2 - y1);
+  c.stroke();
+  const [nx, ny, nw, nh] = frameNameRect(f, zoom);
+  c.beginPath(); c.rect(nx, ny, nw, nh + 2 / zoom); c.clip();
+  c.font = `600 ${14 / zoom}px Nunito, sans-serif`;
+  c.fillStyle = !exporting && state.selected.has(f.id) ? SEL : '#8a8a95';
+  c.textBaseline = 'top';
+  c.fillText(f.name || 'Frame', nx, ny + (nh - 14 / zoom) / 2);
+  c.restore();
+}
+// Draws a list of elements: frames first, then elements (clipped to their frame), bound text right after its container
+function drawScene(c, r, els, { zoom = 1, exporting = false, view = null } = {}) {
+  const map = new Map(els.map((e) => [e.id, e]));
+  const visible = (el) => {
+    if (!view) return true;
+    const b = getBounds(el);
+    return !(b[2] < view[0] || b[0] > view[2] || b[3] < view[1] || b[1] > view[3]);
+  };
+  for (const f of els) if (f.type === 'frame' && visible(f)) drawFrame(c, f, zoom, exporting);
+  for (const el of els) {
+    if (el.type === 'frame' || (el.containerId && map.has(el.containerId))) continue;
+    if (!visible(el)) continue;
+    const fr = el.frameId && map.get(el.frameId);
+    const t = el.boundTextId && map.get(el.boundTextId);
+    c.save();
+    if (fr && fr.type === 'frame') { const [x1, y1, x2, y2] = localBox(fr); c.beginPath(); c.rect(x1, y1, x2 - x1, y2 - y1); c.clip(); }
+    drawElement(c, r, el, exporting, t && isLinear(el) ? t : null);
+    if (t) drawElement(c, r, t, exporting, null, el._erasing);
+    c.restore();
+  }
+}
+function drawGrid() {
+  const z = state.view.zoom;
+  const a = toWorld(0, 0), b = toWorld(innerWidth, innerHeight);
+  const step = z < 0.4 ? GRID * 5 : GRID;
+  ctx.save();
+  ctx.lineWidth = 1 / z;
+  for (let x = Math.floor(a.x / step) * step; x < b.x; x += step) {
+    ctx.strokeStyle = Math.round(x / step) % 5 === 0 ? '#dcdce4' : '#efeff3';
+    ctx.beginPath(); ctx.moveTo(x, a.y); ctx.lineTo(x, b.y); ctx.stroke();
+  }
+  for (let y = Math.floor(a.y / step) * step; y < b.y; y += step) {
+    ctx.strokeStyle = Math.round(y / step) % 5 === 0 ? '#dcdce4' : '#efeff3';
+    ctx.beginPath(); ctx.moveTo(a.x, y); ctx.lineTo(b.x, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+function frame(sel) {
+  if (sel.length === 1) {
+    const el = sel[0]; const [x1, y1, x2, y2] = localBox(el);
+    return { x1, y1, x2, y2, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, angle: el.angle || 0 };
+  }
+  const [x1, y1, x2, y2] = commonBounds(sel);
+  return { x1, y1, x2, y2, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, angle: 0 };
+}
+function showsFrameHandles(sel) { return !(sel.length === 1 && isLinear(sel[0]) && (sel[0].points.length <= 2 || sel[0].elbowed)); }
+function handlePositions(f, sel) {
+  const z = state.view.zoom, pad = 6 / z;
+  const x1 = f.x1 - pad, y1 = f.y1 - pad, x2 = f.x2 + pad, y2 = f.y2 + pad, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const hs = { nw: [x1, y1], ne: [x2, y1], sw: [x1, y2], se: [x2, y2] };
+  if (!sel.every((e) => e.type === 'text' || e.type === 'image')) {
+    if ((x2 - x1) * z > 40) { hs.n = [mx, y1]; hs.s = [mx, y2]; }
+    if ((y2 - y1) * z > 40) { hs.w = [x1, my]; hs.e = [x2, my]; }
+  }
+  if (!sel.some((e) => e.type === 'frame')) hs.rotation = [mx, y1 - 22 / z];
+  return hs;
+}
+function outlineEl(el, pad) {
+  const [x1, y1, x2, y2] = localBox(el);
+  ctx.save();
+  if (el.angle) { const [cx, cy] = center(el); ctx.translate(cx, cy); ctx.rotate(el.angle); ctx.translate(-cx, -cy); }
+  ctx.strokeRect(x1 - pad, y1 - pad, x2 - x1 + pad * 2, y2 - y1 + pad * 2);
+  ctx.restore();
+}
+function drawBindHint() {
+  const el = state.bindHint;
+  if (!el) return;
+  const z = state.view.zoom, o = outlineLocal(el);
+  ctx.save();
+  if (el.angle) { const [cx, cy] = center(el); ctx.translate(cx, cy); ctx.rotate(el.angle); ctx.translate(-cx, -cy); }
+  ctx.strokeStyle = 'rgba(105,101,219,.45)';
+  ctx.lineWidth = 6 / z;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  if (o.ellipse) { const [cx, cy, rx, ry] = o.ellipse; ctx.ellipse(cx, cy, rx + 3 / z, ry + 3 / z, 0, 0, Math.PI * 2); }
+  else { o.poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); }
+  ctx.stroke();
+  ctx.restore();
+}
+function drawSelection() {
+  if (state.editor) return;
+  const sel = selectedEls();
+  if (!sel.length) return;
+  const z = state.view.zoom;
+  ctx.save();
+  ctx.lineWidth = 1 / z;
+  ctx.strokeStyle = SEL;
+  if (sel.length > 1) { ctx.setLineDash([4 / z, 4 / z]); sel.forEach((el) => outlineEl(el, 3 / z)); ctx.setLineDash([]); }
+  const hideHandles = action && action.type === 'move';
+  if (showsFrameHandles(sel)) {
+    const f = frame(sel), pad = 6 / z;
+    ctx.save();
+    if (f.angle) { ctx.translate(f.cx, f.cy); ctx.rotate(f.angle); ctx.translate(-f.cx, -f.cy); }
+    ctx.strokeRect(f.x1 - pad, f.y1 - pad, f.x2 - f.x1 + pad * 2, f.y2 - f.y1 + pad * 2);
+    if (!hideHandles) {
+      const s = 8 / z;
+      ctx.fillStyle = '#fff';
+      for (const [k, [x, y]] of Object.entries(handlePositions(f, sel))) {
+        ctx.beginPath();
+        if (k === 'rotation') ctx.arc(x, y, s / 2, 0, Math.PI * 2); else ctx.rect(x - s / 2, y - s / 2, s, s);
+        ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  if (sel.length === 1 && isLinear(sel[0]) && !hideHandles) {
+    const el = sel[0], wp = worldPoints(el);
+    for (let i = 0; i < wp.length - 1 && !el.elbowed; i++) {
+      const [ax, ay] = wp[i], [bx, by] = wp[i + 1];
+      if (Math.hypot(bx - ax, by - ay) * z < 36) continue;
+      ctx.beginPath(); ctx.arc((ax + bx) / 2, (ay + by) / 2, 4 / z, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(105,101,219,.35)'; ctx.fill();
+    }
+    wp.forEach(([x, y], i) => {
+      if (el.elbowed && i > 0 && i < wp.length - 1) return;
+      const bound = (i === 0 && el.startBinding) || (i === wp.length - 1 && el.endBinding);
+      ctx.beginPath(); ctx.arc(x, y, 5 / z, 0, Math.PI * 2);
+      ctx.fillStyle = bound ? SEL : '#fff'; ctx.fill(); ctx.stroke();
+    });
+  }
+  ctx.restore();
+}
+
+let raf = 0;
+function requestRender() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
+function render() {
+  syncDerived();
+  const v = state.view, z = v.zoom;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * z * v.x, dpr * z * v.y);
+  if (state.grid) drawGrid();
+  const a = toWorld(0, 0), b = toWorld(innerWidth, innerHeight), m = 60 / z;
+  drawScene(ctx, rc, state.elements, { zoom: z, view: [a.x - m, a.y - m, b.x + m, b.y + m] });
+  drawBindHint();
+  drawSelection();
+  if (action && action.type === 'box') {
+    const { start: s, cur: c } = action;
+    ctx.save();
+    ctx.fillStyle = 'rgba(105,101,219,.08)'; ctx.strokeStyle = SEL; ctx.lineWidth = 1 / z;
+    ctx.fillRect(s.x, s.y, c.x - s.x, c.y - s.y); ctx.strokeRect(s.x, s.y, c.x - s.x, c.y - s.y);
+    ctx.restore();
+  }
+  if (state.editor) state.editor.reposition();
+  $('#zoomLabel').textContent = Math.round(z * 100) + '%';
+  $('#welcome').hidden = state.elements.length > 0 || !!state.editor;
+  $('#addLibBtn').disabled = !state.selected.size;
+}
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(innerWidth * dpr);
+  canvas.height = Math.floor(innerHeight * dpr);
+  render();
+}
+
+/* ============================================================
+   Hit testing
+   ============================================================ */
+function hitTest(el, p, tol, allowInsideSelected = true) {
+  if (el.type === 'frame') {
+    const [nx, ny, nw, nh] = frameNameRect(el, state.view.zoom);
+    if (p.x >= nx && p.x <= nx + nw && p.y >= ny && p.y <= ny + nh) return true;
+    const [x1, y1, x2, y2] = localBox(el);
+    return distPoly(p.x, p.y, [[x1, y1], [x2, y1], [x2, y2], [x1, y2]], true) <= tol;
+  }
+  const [x, y] = toLocal(el, p.x, p.y);
+  const lx = x - el.x, ly = y - el.y;
+  const t = tol + el.strokeWidth / 2;
+  const filled = el.backgroundColor && el.backgroundColor !== 'transparent';
+  const inside = filled || (allowInsideSelected && state.selected.has(el.id));
+  const W = el.width, H = el.height, bx = Math.min(0, W), by = Math.min(0, H), w = Math.abs(W), h = Math.abs(H);
+  switch (el.type) {
+    case 'rectangle': {
+      const pts = [[bx, by], [bx + w, by], [bx + w, by + h], [bx, by + h]];
+      return (inside && inPoly(lx, ly, pts)) || distPoly(lx, ly, pts, true) <= t;
+    }
+    case 'diamond': {
+      const pts = [[bx + w / 2, by], [bx + w, by + h / 2], [bx + w / 2, by + h], [bx, by + h / 2]];
+      return (inside && inPoly(lx, ly, pts)) || distPoly(lx, ly, pts, true) <= t;
+    }
+    case 'ellipse': {
+      const rx = Math.max(w / 2, 1), ry = Math.max(h / 2, 1), cx = bx + rx, cy = by + ry;
+      const d = Math.sqrt(((lx - cx) / rx) ** 2 + ((ly - cy) / ry) ** 2);
+      return (inside && d <= 1) || Math.abs(d - 1) * Math.min(rx, ry) <= t;
+    }
+    case 'line': case 'arrow': case 'freedraw': {
+      if (el.points.length === 1) return Math.hypot(lx - el.points[0][0], ly - el.points[0][1]) <= t + 2;
+      if (allowInsideSelected && state.selected.has(el.id) && el.type === 'freedraw') {
+        const [x1, y1, x2, y2] = localBox(el);
+        if (x >= x1 && x <= x2 && y >= y1 && y <= y2) return true;
+      }
+      return distPoly(lx, ly, el.points, false) <= t + (el.type === 'freedraw' ? el.strokeWidth : 0);
+    }
+    case 'text': case 'image':
+      return lx >= bx - tol && ly >= by - tol && lx <= bx + w + tol && ly <= by + h + tol;
+  }
+  return false;
+}
+function elementAt(p) {
+  const tol = 6 / state.view.zoom;
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (el.type === 'frame' || el._editing) continue;
+    if (el.containerId) {
+      const c = byId(el.containerId);
+      if (c) { if (hitTest(el, p, tol)) return c; continue; }
+    }
+    if (hitTest(el, p, tol)) return el;
+  }
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (el.type === 'frame' && hitTest(el, p, tol)) return el;
+  }
+  return null;
+}
+function containerAt(p) {
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (!CONTAINERS.includes(el.type)) continue;
+    const [lx, ly] = toLocal(el, p.x, p.y);
+    if (insideLocal(el, lx, ly, 0)) return el;
+  }
+  return null;
+}
+function hitHandle(p) {
+  const sel = selectedEls();
+  if (!sel.length || state.tool !== 'selection') return null;
+  const z = state.view.zoom, r = 8 / z;
+  if (sel.length === 1 && isLinear(sel[0])) {
+    const wp = worldPoints(sel[0]), elbow = !!sel[0].elbowed;
+    for (let i = wp.length - 1; i >= 0; i--) {
+      if (elbow && i > 0 && i < wp.length - 1) continue;
+      if (Math.hypot(p.x - wp[i][0], p.y - wp[i][1]) < r) return { kind: 'point', index: i };
+    }
+    for (let i = 0; i < wp.length - 1 && !elbow; i++) {
+      const [ax, ay] = wp[i], [bx, by] = wp[i + 1];
+      if (Math.hypot(bx - ax, by - ay) * z < 36) continue;
+      if (Math.hypot(p.x - (ax + bx) / 2, p.y - (ay + by) / 2) < r) return { kind: 'mid', index: i };
+    }
+  }
+  if (!showsFrameHandles(sel)) return null;
+  const f = frame(sel);
+  const [lx, ly] = f.angle ? rotPt(p.x, p.y, f.cx, f.cy, -f.angle) : [p.x, p.y];
+  for (const [k, [hx, hy]] of Object.entries(handlePositions(f, sel))) {
+    if (Math.abs(lx - hx) < r && Math.abs(ly - hy) < r) return k === 'rotation' ? { kind: 'rotate' } : { kind: 'resize', handle: k };
+  }
+  return null;
+}
+function groupMembers(el) {
+  const g = el.groupIds && el.groupIds[el.groupIds.length - 1];
+  if (!g) return [el.id];
+  return state.elements.filter((e) => e.groupIds && e.groupIds.includes(g)).map((e) => e.id);
+}
+
+/* ============================================================
+   Frames & selection sets
+   ============================================================ */
+function updateFrameMembership(cands) {
+  const frames = state.elements.filter((e) => e.type === 'frame');
+  for (const el of cands) {
+    if (el.type === 'frame' || el.containerId) continue;
+    const b = getBounds(el), cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    let fid = null;
+    for (let i = frames.length - 1; i >= 0; i--) {
+      const [x1, y1, x2, y2] = localBox(frames[i]);
+      if (cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2) { fid = frames[i].id; break; }
+    }
+    el.frameId = fid;
+  }
+}
+// Selected ids plus the children of any selected frame (bound text is derived and excluded)
+function moveSet() {
+  const ids = new Set(state.selected);
+  const frames = new Set(selectedEls().filter((e) => e.type === 'frame').map((e) => e.id));
+  if (frames.size) for (const e of state.elements) if (e.frameId && frames.has(e.frameId)) ids.add(e.id);
+  for (const id of [...ids]) if (byId(id)?.containerId) ids.delete(id);
+  return ids;
+}
+// Elements to copy/duplicate/export: selection + frame children + bound text, in z-order
+function expandForCopy(els) {
+  const ids = new Set(els.map((e) => e.id));
+  const frames = new Set(els.filter((e) => e.type === 'frame').map((e) => e.id));
+  for (const e of state.elements) if (e.frameId && frames.has(e.frameId)) ids.add(e.id);
+  for (const e of state.elements) if (e.containerId && ids.has(e.containerId)) ids.add(e.id);
+  return state.elements.filter((e) => ids.has(e.id));
+}
+// Arrows moving without their target lose the binding
+function unbindOutside(ids) {
+  for (const id of ids) {
+    const a = byId(id);
+    if (!a || a.type !== 'arrow') continue;
+    if (a.startBinding && !ids.has(a.startBinding.elementId)) a.startBinding = null;
+    if (a.endBinding && !ids.has(a.endBinding.elementId)) a.endBinding = null;
+  }
+}
+
+/* ============================================================
+   Transformations
+   ============================================================ */
+function normalize(el) {
+  if (el.points) {
+    const [ox, oy] = el.points[0];
+    if (ox || oy) { el.x += ox; el.y += oy; el.points = el.points.map((p) => [p[0] - ox, p[1] - oy]); bump(el); }
+    const [x1, y1, x2, y2] = localBox(el);
+    el.width = x2 - x1; el.height = y2 - y1;
+    return;
+  }
+  if (el.width < 0) { el.x += el.width; el.width = -el.width; bump(el); }
+  if (el.height < 0) { el.y += el.height; el.height = -el.height; bump(el); }
+}
+function scaleEl(el, o, ax, ay, sx, sy) {
+  const mx = (x) => ax + (x - ax) * sx, my = (y) => ay + (y - ay) * sy;
+  if (o.points) {
+    el.x = mx(o.x); el.y = my(o.y);
+    el.points = o.points.map((p) => [p[0] * sx, p[1] * sy]);
+  } else if (o.type === 'text') {
+    el.fontSize = Math.max(4, o.fontSize * Math.abs(sy));
+    measureText(el);
+    el.x = Math.min(mx(o.x), mx(o.x + o.width));
+    el.y = Math.min(my(o.y), my(o.y + o.height));
+  } else {
+    el.x = mx(o.x); el.y = my(o.y); el.width = o.width * sx; el.height = o.height * sy;
+  }
+  bump(el);
+}
+function doResize(a, p, shift) {
+  const f = a.frame;
+  const [lx, ly] = f.angle ? rotPt(p.x, p.y, f.cx, f.cy, -f.angle) : [p.x, p.y];
+  const dx = lx - a.startL[0], dy = ly - a.startL[1];
+  const ow = Math.max(f.x2 - f.x1, 1e-6), oh = Math.max(f.y2 - f.y1, 1e-6), h = a.handle;
+  let sx = 1, sy = 1, ax = f.x1, ay = f.y1;
+  if (h.includes('e')) { sx = (ow + dx) / ow; ax = f.x1; } else if (h.includes('w')) { sx = (ow - dx) / ow; ax = f.x2; }
+  if (h.includes('s')) { sy = (oh + dy) / oh; ay = f.y1; } else if (h.includes('n')) { sy = (oh - dy) / oh; ay = f.y2; }
+  if (shift !== a.keepRatio) {
+    if (h.length === 2) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; }
+    else if (h === 'e' || h === 'w') { sy = Math.abs(sx); ay = f.cy; }
+    else { sx = Math.abs(sy); ax = f.cx; }
+  }
+  for (const [id, o] of a.orig) {
+    const el = byId(id); if (!el) continue;
+    scaleEl(el, o, ax, ay, sx, sy);
+    if (a.single) fixRotation(el, [f.cx, f.cy]);
+  }
+}
+function doRotate(a, p, shift) {
+  let d = Math.atan2(p.y - a.cy, p.x - a.cx) - a.startAng;
+  const step = Math.PI / 12, single = a.orig.size === 1;
+  if (shift && !single) d = Math.round(d / step) * step;
+  for (const [id, o] of a.orig) {
+    const el = byId(id); if (!el) continue;
+    let ang = (o.angle || 0) + d;
+    if (shift && single) ang = Math.round(ang / step) * step;
+    const dd = ang - (o.angle || 0);
+    const [ocx, ocy] = center(o);
+    const [ncx, ncy] = rotPt(ocx, ocy, a.cx, a.cy, dd);
+    el.x = o.x + ncx - ocx; el.y = o.y + ncy - ocy;
+    el.angle = ((ang % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  }
+}
+function doPoint(a, p, shift) {
+  const el = a.el, o = a.orig, c0 = center(o);
+  const [lx, ly] = o.angle ? rotPt(p.x, p.y, c0[0], c0[1], -o.angle) : [p.x, p.y];
+  el.x = o.x; el.y = o.y; el.angle = o.angle;
+  el.points = o.points.map((q) => [...q]);
+  let nx = snap(lx) - o.x, ny = snap(ly) - o.y;
+  if (shift) {
+    const ref = o.points[a.index === 0 ? 1 : a.index - 1];
+    if (ref) {
+      const ddx = lx - o.x - ref[0], ddy = ly - o.y - ref[1];
+      const len = Math.hypot(ddx, ddy), ang = Math.round(Math.atan2(ddy, ddx) / (Math.PI / 12)) * (Math.PI / 12);
+      nx = ref[0] + len * Math.cos(ang); ny = ref[1] + len * Math.sin(ang);
+    }
+  }
+  el.points[a.index] = [nx, ny];
+  fixRotation(el, c0);
+  bump(el);
+  a.cur = p;
+  if (el.type === 'arrow' && a.endpoint) state.bindHint = findBindTarget(p);
+}
+function updateCreate(a, p, e) {
+  const el = a.el;
+  a.cur = p;
+  if (el.type === 'freedraw') {
+    const evs = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
+    for (const ev of evs.length ? evs : [e]) {
+      const q = toWorld(ev.clientX, ev.clientY);
+      el.points.push([q.x - el.x, q.y - el.y]);
+      el.pressures.push(ev.pressure || 0.5);
+    }
+    bump(el);
+    return;
+  }
+  p = snapPt(p);
+  if (isLinear(el)) {
+    let dx = p.x - el.x, dy = p.y - el.y;
+    if (e.shiftKey) {
+      const len = Math.hypot(dx, dy), ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 12)) * (Math.PI / 12);
+      dx = len * Math.cos(ang); dy = len * Math.sin(ang);
+    }
+    el.points[el.points.length - 1] = [dx, dy];
+    bump(el);
+    if (el.type === 'arrow') state.bindHint = findBindTarget(a.cur);
+    return;
+  }
+  let w = p.x - a.start.x, h = p.y - a.start.y;
+  if (e.shiftKey) { const d = Math.max(Math.abs(w), Math.abs(h)); w = Math.sign(w || 1) * d; h = Math.sign(h || 1) * d; }
+  if (e.altKey) { el.x = a.start.x - w; el.y = a.start.y - h; w *= 2; h *= 2; }
+  else { el.x = a.start.x; el.y = a.start.y; }
+  el.width = w; el.height = h;
+  bump(el);
+}
+function eraseAt(p) {
+  const tol = 8 / state.view.zoom;
+  for (const el of state.elements) {
+    if (el._erasing || !hitTest(el, p, tol, false)) continue;
+    const target = (el.containerId && byId(el.containerId)) || el;
+    groupMembers(target).forEach((id) => { const g = byId(id); if (g) g._erasing = true; });
+  }
+}
+function deleteElements(ids) {
+  const set = new Set(ids);
+  for (const el of state.elements) if (el.type === 'frame' && set.has(el.id)) state.elements.forEach((c) => { if (c.frameId === el.id) set.add(c.id); });
+  for (const el of state.elements) if (el.containerId && set.has(el.containerId)) set.add(el.id);
+  state.elements = state.elements.filter((e) => !set.has(e.id));
+  for (const id of set) state.selected.delete(id);
+  cleanup();
+}
+
+/* ============================================================
+   History & persistence
+   ============================================================ */
+const history = { stack: [], index: -1 };
+const snapshot = () => JSON.stringify(state.elements, (k, v) => (k[0] === '_' ? undefined : v));
+function commit() {
+  cleanup();
+  syncDerived();
+  const s = snapshot();
+  if (history.stack[history.index] === s) return;
+  history.stack = history.stack.slice(0, history.index + 1);
+  history.stack.push(s);
+  if (history.stack.length > 200) history.stack.shift();
+  history.index = history.stack.length - 1;
+  persist();
+  updateFooter();
+}
+function restoreHistory() {
+  state.elements = JSON.parse(history.stack[history.index]);
+  state.selected = new Set([...state.selected].filter((id) => byId(id)));
+  persist(); updateFooter(); renderProps(); requestRender();
+}
+function undo() { if (history.index > 0) { history.index--; restoreHistory(); } }
+function redo() { if (history.index < history.stack.length - 1) { history.index++; restoreHistory(); } }
+const sceneState = () => ({ elements: JSON.parse(snapshot()), style: state.style, view: state.view, theme: state.theme, grid: state.grid });
+let persistTimer = 0;
+function persist() {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sceneState())); }
+    catch (err) { console.warn('Could not save to localStorage', err); }
+  }, 250);
+}
+function loadLocal() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (!d) return;
+    state.elements = importElements(d.elements || []);
+    Object.assign(state.style, d.style || {});
+    if (d.view) state.view = d.view;
+    state.grid = !!d.grid;
+    setTheme(d.theme || 'light');
+  } catch (err) { console.warn(err); }
+}
+
+// Image files live in IndexedDB (too big for localStorage)
+const idb = (() => {
+  let p;
+  const open = () => (p ??= new Promise((res, rej) => {
+    const r = indexedDB.open('sketchboard', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('files');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  }));
+  return {
+    async put(id, v) { try { (await open()).transaction('files', 'readwrite').objectStore('files').put(v, id); } catch (e) { console.warn(e); } },
+    async all() {
+      try {
+        const db = await open();
+        return await new Promise((res) => {
+          const out = {}, req = db.transaction('files').objectStore('files').openCursor();
+          req.onsuccess = () => { const c = req.result; if (c) { out[c.key] = c.value; c.continue(); } else res(out); };
+          req.onerror = () => res(out);
+        });
+      } catch { return {}; }
+    },
+  };
+})();
+function addFiles(files) {
+  for (const [id, f] of Object.entries(files || {})) {
+    if (!f || !f.dataURL || state.files[id]) continue;
+    state.files[id] = { id, mimeType: f.mimeType, dataURL: f.dataURL, created: f.created || Date.now() };
+    idb.put(id, state.files[id]);
+  }
+}
+function filesFor(els) {
+  const out = {};
+  for (const e of els) if (e.type === 'image' && state.files[e.fileId]) out[e.fileId] = state.files[e.fileId];
+  return out;
+}
+
+/* ============================================================
+   Excalidraw-compatible file format
+   ============================================================ */
+function boundElementsMap(els) {
+  const m = new Map();
+  const add = (id, v) => { if (!m.has(id)) m.set(id, []); m.get(id).push(v); };
+  for (const e of els) {
+    if (e.containerId) add(e.containerId, { type: 'text', id: e.id });
+    if (e.type === 'arrow') {
+      if (e.startBinding) add(e.startBinding.elementId, { type: 'arrow', id: e.id });
+      if (e.endBinding && e.endBinding.elementId !== e.startBinding?.elementId) add(e.endBinding.elementId, { type: 'arrow', id: e.id });
+    }
+  }
+  return m;
+}
+function toExcalidraw(el, bm) {
+  const o = clone(el);
+  delete o.boundTextId;
+  Object.assign(o, {
+    angle: el.angle || 0, groupIds: el.groupIds || [], frameId: el.frameId || null, boundElements: bm?.get(el.id) || null,
+    updated: Date.now(), link: null, locked: false, isDeleted: false, version: el.version || 1,
+    versionNonce: el.versionNonce || newSeed(), roundness: el.roundness || null,
+  });
+  if (el.points) {
+    const xs = el.points.map((p) => p[0]), ys = el.points.map((p) => p[1]);
+    o.width = Math.max(...xs) - Math.min(...xs); o.height = Math.max(...ys) - Math.min(...ys);
+    o.points = el.points.map((p) => [p[0], p[1]]);
+    o.lastCommittedPoint = null;
+  }
+  if (isLinear(el)) {
+    const b = (x) => (x ? { elementId: x.elementId, focus: 0, gap: BIND_GAP, fx: x.fx, fy: x.fy } : null);
+    o.startBinding = b(el.startBinding); o.endBinding = b(el.endBinding);
+    o.startArrowhead = el.startArrowhead || null; o.endArrowhead = el.type === 'arrow' ? el.endArrowhead || null : null;
+    if (el.type === 'arrow') { o.elbowed = !!el.elbowed; if (el.elbowed) o.roundness = null; }
+  }
+  if (el.type === 'freedraw') { o.pressures = el.simulatePressure ? [] : el.pressures; o.simulatePressure = !!el.simulatePressure; }
+  if (el.type === 'text') Object.assign(o, { originalText: el.originalText ?? el.text, containerId: el.containerId || null, lineHeight: LINE_H, verticalAlign: el.containerId ? 'middle' : 'top', autoResize: true });
+  if (el.type === 'image') Object.assign(o, { status: 'saved', scale: [1, 1] });
+  return o;
+}
+function fromExcalidraw(e) {
+  if (!e || e.isDeleted || !ELEMENT_TYPES.includes(e.type)) return null;
+  const type = e.type === 'magicframe' ? 'frame' : e.type;
+  const el = {
+    id: e.id || uid(), type, x: +e.x || 0, y: +e.y || 0, width: +e.width || 0, height: +e.height || 0, angle: +e.angle || 0,
+    strokeColor: e.strokeColor || '#1e1e1e', backgroundColor: e.backgroundColor || 'transparent', fillStyle: e.fillStyle || 'hachure',
+    strokeWidth: e.strokeWidth ?? 2, strokeStyle: e.strokeStyle || 'solid', roughness: e.roughness ?? 1, opacity: e.opacity ?? 100,
+    groupIds: e.groupIds || [], frameId: e.frameId || null, roundness: e.roundness || null, seed: e.seed || newSeed(),
+    version: e.version || 1, versionNonce: newSeed(),
+  };
+  if (e.points) el.points = e.points.map((p) => [p[0], p[1]]);
+  if (isLinear(el)) {
+    if (!el.points || el.points.length < 2) el.points = [[0, 0], [el.width, el.height]];
+    const mapHead = (h) => (!h ? null : h.startsWith('triangle') ? 'triangle' : /dot|circle/.test(h) ? 'dot' : 'arrow');
+    el.startArrowhead = mapHead(e.startArrowhead);
+    el.endArrowhead = type === 'arrow' ? mapHead(e.endArrowhead === undefined ? 'arrow' : e.endArrowhead) : null;
+    el.startBinding = type === 'arrow' ? e.startBinding || null : null;
+    el.endBinding = type === 'arrow' ? e.endBinding || null : null;
+    el.elbowed = type === 'arrow' && !!e.elbowed;
+  }
+  if (type === 'freedraw') {
+    if (!el.points || !el.points.length) return null;
+    el.pressures = e.pressures || []; el.simulatePressure = e.simulatePressure ?? !el.pressures.length;
+  }
+  if (type === 'text') {
+    const famMap = { 1: 1, 2: 2, 3: 3, 5: 1, 6: 2, 7: 2, 8: 3 };
+    Object.assign(el, { fontSize: e.fontSize || 20, fontFamily: famMap[e.fontFamily] || 1, textAlign: e.textAlign || 'left', containerId: e.containerId || null });
+    el.text = e.text ?? e.originalText ?? '';
+    el.originalText = el.containerId ? e.originalText ?? e.text ?? '' : el.text;
+    measureText(el);
+  }
+  if (type === 'image') el.fileId = e.fileId || null;
+  if (type === 'frame') el.name = e.name || 'Frame';
+  return el;
+}
+// Convert + re-link (bound text, bindings, frames)
+function importElements(raw) {
+  const els = (raw || []).map(fromExcalidraw).filter(Boolean);
+  const map = new Map(els.map((e) => [e.id, e]));
+  for (const t of els) {
+    if (t.type !== 'text' || !t.containerId) continue;
+    const c = map.get(t.containerId);
+    if (c && (CONTAINERS.includes(c.type) || isLinear(c)) && !c.boundTextId) c.boundTextId = t.id;
+    else { t.containerId = null; t.originalText = t.text; }
+  }
+  for (const a of els) {
+    if (a.type !== 'arrow') continue;
+    for (const [k, last] of [['startBinding', false], ['endBinding', true]]) {
+      const b = a[k];
+      if (!b) continue;
+      const t = map.get(b.elementId);
+      if (!t || !BINDABLE.includes(t.type) || t.containerId) { a[k] = null; continue; }
+      if (typeof b.fx === 'number' && typeof b.fy === 'number') a[k] = { elementId: b.elementId, fx: b.fx, fy: b.fy };
+      else { const wp = worldPoints(a), q = last ? wp[wp.length - 1] : wp[0]; a[k] = makeBinding(t, { x: q[0], y: q[1] }); }
+    }
+  }
+  cleanup(els);
+  return els;
+}
+function serializeScene() {
+  const bm = boundElementsMap(state.elements);
+  return JSON.stringify({
+    type: 'excalidraw', version: 2, source: 'sketchboard',
+    elements: state.elements.map((e) => toExcalidraw(e, bm)),
+    appState: { viewBackgroundColor: '#ffffff', gridSize: state.grid ? GRID : null },
+    files: filesFor(state.elements),
+  }, null, 2);
+}
+function loadScene(text) {
+  try {
+    const d = JSON.parse(text);
+    if (d && (d.type === 'excalidrawlib' || d.libraryItems || d.library)) { importLibrary(d); return; }
+    const els = Array.isArray(d) ? d : d.elements;
+    if (!Array.isArray(els)) throw new Error('No elements found');
+    addFiles(d.files);
+    state.elements = importElements(els);
+    state.selected.clear();
+    shapeCache.clear();
+    commit(); zoomToFit(); renderProps();
+    toast(`Loaded ${state.elements.length} element(s)`);
+  } catch (err) { toast('Could not open file: ' + err.message); }
+}
+
+/* ============================================================
+   Export
+   ============================================================ */
+const exportElements = (onlySelected) => (onlySelected && state.selected.size ? expandForCopy(selectedEls()) : state.elements);
+function renderToCanvas(els, { scale = 2, background = true, dark = false, fit = null } = {}) {
+  if (!els.length) return null;
+  const [x1, y1, x2, y2] = exportBounds(els), pad = fit ? 8 : 16;
+  const bw = x2 - x1 + pad * 2, bh = y2 - y1 + pad * 2;
+  if (fit) scale = Math.min(fit[0] / bw, fit[1] / bh, 1.5) * (window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.ceil(bw * scale)), h = Math.max(1, Math.ceil(bh * scale));
+  const c1 = document.createElement('canvas'); c1.width = w; c1.height = h;
+  const cx = c1.getContext('2d');
+  if (background) { cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, w, h); }
+  cx.scale(scale, scale); cx.translate(pad - x1, pad - y1);
+  drawScene(cx, rough.canvas(c1), els, { exporting: true });
+  if (fit) { c1.style.width = w / (window.devicePixelRatio || 1) + 'px'; c1.style.height = h / (window.devicePixelRatio || 1) + 'px'; }
+  if (!dark) return c1;
+  const c2 = document.createElement('canvas'); c2.width = w; c2.height = h;
+  const c2x = c2.getContext('2d');
+  c2x.filter = 'invert(93%) hue-rotate(180deg)';
+  c2x.drawImage(c1, 0, 0);
+  return c2;
+}
+function renderExportSvg({ background = true, dark = false, onlySelected = false } = {}) {
+  const els = exportElements(onlySelected);
+  if (!els.length) return null;
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs = {}) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+  const [x1, y1, x2, y2] = exportBounds(els), pad = 16, ox = pad - x1, oy = pad - y1;
+  const W = x2 - x1 + pad * 2, H = y2 - y1 + pad * 2;
+  const svg = mk('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+  if (dark) svg.setAttribute('style', 'filter: invert(93%) hue-rotate(180deg)');
+  const defs = mk('defs'), style = mk('style');
+  style.textContent = "@font-face{font-family:Virgil;src:url(https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw-assets/Virgil.woff2);}";
+  defs.appendChild(style); svg.appendChild(defs);
+  if (background) svg.appendChild(mk('rect', { width: W, height: H, fill: '#ffffff' }));
+  const rsvg = rough.svg(svg), map = new Map(els.map((e) => [e.id, e]));
+
+  const elementSvg = (el) => {
+    let tr = '';
+    if (el.angle) { const [cx, cy] = center(el); tr += `rotate(${(el.angle * 180) / Math.PI} ${cx + ox} ${cy + oy}) `; }
+    tr += `translate(${el.x + ox} ${el.y + oy})`;
+    const g = mk('g', { transform: tr });
+    if (el.opacity < 100) g.setAttribute('opacity', el.opacity / 100);
+    if (el.type === 'text') {
+      const lead = ((LINE_H - 1) * el.fontSize) / 2;
+      const anchor = el.textAlign === 'center' ? 'middle' : el.textAlign === 'right' ? 'end' : 'start';
+      const tx = el.textAlign === 'center' ? el.width / 2 : el.textAlign === 'right' ? el.width : 0;
+      el.text.split('\n').forEach((line, i) => {
+        const t = mk('text', { x: tx, y: i * el.fontSize * LINE_H + lead, 'font-family': FONTS[el.fontFamily], 'font-size': el.fontSize,
+          fill: el.strokeColor, 'text-anchor': anchor, 'dominant-baseline': 'text-before-edge', style: 'white-space: pre' });
+        t.textContent = line;
+        g.appendChild(t);
+      });
+    } else if (el.type === 'image') {
+      const f = state.files[el.fileId];
+      if (f) g.appendChild(mk('image', { href: f.dataURL, x: Math.min(0, el.width), y: Math.min(0, el.height), width: Math.abs(el.width), height: Math.abs(el.height), preserveAspectRatio: 'none' }));
+    } else {
+      const s = getShape(el);
+      if (s.free) g.appendChild(mk('path', { d: s.d, fill: el.strokeColor }));
+      else s.forEach((d) => g.appendChild(rsvg.draw(d)));
+    }
+    return g;
+  };
+  for (const f of els) {
+    if (f.type !== 'frame') continue;
+    const [fx1, fy1, fx2, fy2] = localBox(f);
+    svg.appendChild(mk('rect', { x: fx1 + ox, y: fy1 + oy, width: fx2 - fx1, height: fy2 - fy1, rx: 8, fill: 'none', stroke: '#a5a5b0', 'stroke-width': 1 }));
+    const t = mk('text', { x: fx1 + ox, y: fy1 + oy - 6, 'font-family': 'Nunito, sans-serif', 'font-size': 14, 'font-weight': 600, fill: '#8a8a95' });
+    t.textContent = f.name || 'Frame';
+    svg.appendChild(t);
+    const cp = mk('clipPath', { id: 'clip-' + f.id });
+    cp.appendChild(mk('rect', { x: fx1 + ox, y: fy1 + oy, width: fx2 - fx1, height: fy2 - fy1 }));
+    defs.appendChild(cp);
+  }
+  for (const el of els) {
+    if (el.type === 'frame' || (el.containerId && map.has(el.containerId))) continue;
+    let parent = svg;
+    if (el.frameId && map.get(el.frameId)?.type === 'frame') { parent = mk('g', { 'clip-path': `url(#clip-${el.frameId})` }); svg.appendChild(parent); }
+    const t = el.boundTextId && map.get(el.boundTextId);
+    let g = elementSvg(el);
+    if (t && isLinear(el) && (t.originalText || '').trim()) {
+      const m = mk('mask', { id: 'mask-' + el.id, maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H });
+      m.appendChild(mk('rect', { x: 0, y: 0, width: W, height: H, fill: '#fff' }));
+      m.appendChild(mk('rect', { x: t.x + ox - 5, y: t.y + oy - 3, width: t.width + 10, height: t.height + 6, fill: '#000' }));
+      defs.appendChild(m);
+      const wrap = mk('g', { mask: `url(#mask-${el.id})` });
+      wrap.appendChild(g); g = wrap;
+    }
+    parent.appendChild(g);
+    if (t) parent.appendChild(elementSvg(t));
+  }
+  return new XMLSerializer().serializeToString(svg);
+}
+function download(name, data, type) {
+  const blob = data instanceof Blob ? data : new Blob([data], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+const exportOpts = () => ({ scale: +$('#expScale').value, background: $('#expBg').checked, dark: $('#expDark').checked, onlySelected: $('#expSel').checked });
+function updateExportPreview() {
+  const prev = $('#exportPreview');
+  prev.innerHTML = '';
+  const o = exportOpts();
+  const c = renderToCanvas(exportElements(o.onlySelected), { ...o, scale: 1 });
+  if (c) prev.appendChild(c); else prev.textContent = 'Nothing to export';
+}
+function openExport() {
+  if (!state.elements.length) { toast('Nothing to export yet'); return; }
+  $('#expSelWrap').style.display = state.selected.size ? '' : 'none';
+  $('#expSel').checked = state.selected.size > 0;
+  $('#expDark').checked = false;
+  openModal('#exportModal');
+  updateExportPreview();
+}
+
+/* ============================================================
+   Text editing (free text, text in shapes, connector labels)
+   ============================================================ */
+function editText(el, isNew = false) {
+  if (state.editor) state.editor.ta.blur();
+  const container = el.containerId ? byId(el.containerId) : null;
+  el._editing = true;
+  state.selected.clear();
+  const ta = document.createElement('textarea');
+  ta.className = 'text-editor';
+  ta.value = el.originalText ?? el.text ?? '';
+  ta.spellcheck = false;
+  if (!container) ta.wrap = 'off';
+  const reposition = () => {
+    const z = state.view.zoom;
+    let left = el.x, width = Math.max(el.width, 4) * z + 24;
+    if (container) { const maxW = boundMaxWidth(container); left = el.x + el.width / 2 - maxW / 2; width = maxW * z + 2; }
+    const s = toScreen(left, el.y);
+    Object.assign(ta.style, {
+      left: s.x + 'px', top: s.y + 'px', font: fontStr(el, z), color: el.strokeColor, lineHeight: String(LINE_H),
+      textAlign: el.textAlign, opacity: el.opacity / 100, width: width + 'px', height: el.height * z + 4 + 'px',
+      whiteSpace: container ? 'pre-wrap' : 'pre', overflowWrap: container ? 'break-word' : 'normal',
+      transformOrigin: `${(el.x + el.width / 2 - left) * z}px ${(el.height * z) / 2}px`,
+      transform: el.angle ? `rotate(${el.angle}rad)` : '',
+    });
+  };
+  ta.addEventListener('input', () => {
+    el.originalText = ta.value;
+    if (container) syncDerived(); else { el.text = ta.value; measureText(el); }
+    bump(el); reposition(); requestRender();
+  });
+  ta.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) { e.preventDefault(); ta.blur(); }
+    if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertText', false, '    '); }
+  });
+  ta.addEventListener('blur', () => {
+    const val = ta.value.replace(/\s+$/, '');
+    el._editing = false;
+    ta.remove();
+    state.editor = null;
+    el.originalText = val;
+    if (!container) el.text = val;
+    if (!val.trim()) {
+      state.elements = state.elements.filter((e) => e !== el);
+      if (container) container.boundTextId = null;
+      if (container) state.selected = new Set([container.id]);
+    } else {
+      if (container) delete el._wk; else measureText(el);
+      bump(el);
+      state.selected = new Set([container ? container.id : el.id]);
+    }
+    if (!state.locked) setTool('selection', true);
+    commit(); renderProps(); requestRender();
+  }, { once: true });
+  document.body.appendChild(ta);
+  state.editor = { ta, el, reposition };
+  reposition();
+  renderProps();
+  requestRender();
+  setTimeout(() => { ta.focus(); if (!isNew) ta.select(); }, 0);
+}
+function editBound(c) {
+  const t = c.boundTextId && byId(c.boundTextId);
+  if (t) editText(t); else editText(createBoundText(c), true);
+}
+
+/* ============================================================
+   Images
+   ============================================================ */
+const readDataURL = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+const loadImg = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+function pickImage() { $('#imageInput').click(); }
+async function insertImage(file, at = viewCenter()) {
+  if (!file || !file.type.startsWith('image/')) return;
+  try {
+    let dataURL = await readDataURL(file);
+    const img = await loadImg(dataURL);
+    let w = img.naturalWidth || 300, h = img.naturalHeight || 150;
+    const MAX = 2000;
+    if (file.type !== 'image/svg+xml' && Math.max(w, h) > MAX) {
+      const s = MAX / Math.max(w, h), cv = document.createElement('canvas');
+      cv.width = Math.round(w * s); cv.height = Math.round(h * s);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      dataURL = cv.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.9);
+    }
+    const id = 'f_' + uid();
+    addFiles({ [id]: { mimeType: file.type, dataURL } });
+    const maxSide = Math.min(480, (Math.min(innerWidth, innerHeight) * 0.6) / state.view.zoom);
+    const s = Math.min(1, maxSide / Math.max(w, h));
+    const dw = w * s, dh = h * s;
+    const el = createElement('image', { x: at.x - dw / 2, y: at.y - dh / 2 });
+    Object.assign(el, { fileId: id, width: dw, height: dh });
+    state.elements.push(el);
+    state.selected = new Set([el.id]);
+    updateFrameMembership([el]);
+    setTool('selection', true);
+    commit(); renderProps(); requestRender();
+  } catch (err) { toast('Could not load image'); console.warn(err); }
+}
+
+/* ============================================================
+   Clone / insert helpers
+   ============================================================ */
+function cloneWithNewIds(els, offset) {
+  const idMap = new Map(els.map((e) => [e.id, uid()]));
+  const gmap = new Map();
+  return els.map((e) => {
+    const c = clone(e);
+    c.id = idMap.get(e.id); c.seed = newSeed(); c.versionNonce = newSeed();
+    c.x += offset; c.y += offset;
+    c.groupIds = (c.groupIds || []).map((g) => { if (!gmap.has(g)) gmap.set(g, uid()); return gmap.get(g); });
+    if (c.containerId) c.containerId = idMap.get(c.containerId) ?? null;
+    if (c.boundTextId) c.boundTextId = idMap.get(c.boundTextId) ?? null;
+    if (c.frameId && idMap.has(c.frameId)) c.frameId = idMap.get(c.frameId);
+    for (const k of ['startBinding', 'endBinding']) if (c[k]) c[k] = idMap.has(c[k].elementId) ? { ...c[k], elementId: idMap.get(c[k].elementId) } : null;
+    if (c.type === 'text' && c.containerId == null) c.originalText = c.text;
+    return c;
+  });
+}
+const topLevel = (els) => {
+  const frames = new Set(els.filter((e) => e.type === 'frame').map((e) => e.id));
+  return els.filter((e) => !e.containerId && !(e.frameId && frames.has(e.frameId)));
+};
+// Insert a set of (already-imported) elements centred on a point
+function insertElements(els, at) {
+  if (!els.length) return;
+  const copies = cloneWithNewIds(els, 0);
+  syncDerived(copies);
+  const [x1, y1, x2, y2] = commonBounds(copies.filter((e) => !e.containerId));
+  const dx = at.x - (x1 + x2) / 2, dy = at.y - (y1 + y2) / 2;
+  copies.forEach((c) => { c.x += dx; c.y += dy; });
+  state.elements.push(...copies);
+  state.selected = new Set(topLevel(copies).map((c) => c.id));
+  updateFrameMembership(copies.filter((c) => !copies.some((f) => f.type === 'frame' && f.id === c.frameId)));
+  setTool('selection', true);
+  commit(); renderProps(); requestRender();
+}
+function duplicateSelected(offset = 10) {
+  const src = expandForCopy(selectedEls());
+  const copies = cloneWithNewIds(src, offset);
+  state.elements.push(...copies);
+  state.selected = new Set(topLevel(copies).map((c) => c.id));
+  return copies;
+}
+
+/* ============================================================
+   Shape library
+   ============================================================ */
+function saveLibrary() {
+  try { localStorage.setItem(LIB_KEY, JSON.stringify(state.library, (k, v) => (k[0] === '_' ? undefined : v))); }
+  catch { toast('Library is too large to save locally'); }
+}
+function defaultLibrary() {
+  const base = { strokeColor: '#1e1e1e', fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid', roughness: 1, opacity: 100, angle: 0, groupIds: [], frameId: null };
+  const shape = (type, x, y, w, h, bg, extra = {}) => Object.assign(createElement(type, { x, y }), base, { width: w, height: h, backgroundColor: bg, roundness: type === 'rectangle' ? { type: 3 } : null }, extra);
+  const label = (c, text) => {
+    const t = Object.assign(createElement('text', { x: 0, y: 0 }), base, { containerId: c.id, text, originalText: text, textAlign: 'center', fontSize: 20, fontFamily: 1 });
+    c.boundTextId = t.id;
+    return t;
+  };
+  const arrow = (a, b, x1, y1, x2, y2) => Object.assign(createElement('arrow', { x: x1, y: y1 }), base, {
+    points: [[0, 0], [x2 - x1, y2 - y1]], roundness: { type: 2 }, startArrowhead: null, endArrowhead: 'arrow', backgroundColor: 'transparent',
+    startBinding: { elementId: a.id, fx: 0.5, fy: 0.5 }, endBinding: { elementId: b.id, fx: 0.5, fy: 0.5 },
+  });
+  const items = [];
+  const add = (name, els) => { syncDerived(els); items.push({ id: uid(), name, created: Date.now(), elements: els }); };
+  { const r = shape('rectangle', 0, 0, 160, 70, '#a5d8ff'); add('Process', [r, label(r, 'Process')]); }
+  { const d = shape('diamond', 0, 0, 170, 110, '#ffec99'); add('Decision', [d, label(d, 'Decision?')]); }
+  { const e = shape('ellipse', 0, 0, 150, 70, '#b2f2bb'); add('Start / End', [e, label(e, 'Start')]); }
+  { const n = shape('rectangle', 0, 0, 180, 110, '#ffc9c9', { roundness: null }); add('Note', [n, label(n, 'Note')]); }
+  {
+    const a = shape('rectangle', 0, 0, 120, 60, '#d0bfff'), b = shape('rectangle', 260, 0, 120, 60, '#d0bfff');
+    const ar = arrow(a, b, 60, 30, 320, 30);
+    const lbl = label(ar, 'calls'); lbl.fontSize = 16;
+    add('Connected boxes', [a, label(a, 'Client'), b, label(b, 'Server'), ar, lbl]);
+  }
+  {
+    const a = shape('ellipse', 0, 0, 120, 60, '#b2f2bb'), b = shape('diamond', 0, 140, 140, 90, '#ffec99');
+    const ar = arrow(a, b, 60, 30, 70, 185);
+    add('Flow step', [a, label(a, 'Start'), b, label(b, 'OK?'), ar]);
+  }
+  return items;
+}
+function loadLibrary() {
+  try {
+    const raw = localStorage.getItem(LIB_KEY);
+    state.library = raw ? JSON.parse(raw) : defaultLibrary();
+    for (const item of state.library) { addFiles(item.files); item.elements = importElements(item.elements); }
+  } catch { state.library = defaultLibrary(); }
+}
+function renderLibrary() {
+  const box = $('#libItems');
+  box.innerHTML = '';
+  if (!state.library.length) {
+    box.innerHTML = '<div class="lib-empty">No items yet.<br>Select something on the canvas and choose <b>Add selection to library</b>, or import an <code>.excalidrawlib</code> file.</div>';
+    return;
+  }
+  for (const item of state.library) {
+    const div = document.createElement('div');
+    div.className = 'lib-item';
+    div.draggable = true;
+    div.title = (item.name || 'Library item') + ' — click to insert or drag onto the canvas';
+    syncDerived(item.elements);
+    const c = renderToCanvas(item.elements, { background: false, fit: [118, 82] });
+    if (c) div.appendChild(c);
+    const del = document.createElement('button');
+    del.className = 'del'; del.title = 'Remove from library';
+    del.innerHTML = '<i data-lucide="x"></i>';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.library = state.library.filter((i) => i !== item);
+      saveLibrary(); renderLibrary();
+    });
+    div.appendChild(del);
+    div.addEventListener('click', () => insertElements(importElements(clone(item.elements)), viewCenter()));
+    div.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-sketchboard-lib', item.id); e.dataTransfer.effectAllowed = 'copy'; });
+    box.appendChild(div);
+  }
+  refreshIcons();
+}
+function addToLibrary() {
+  if (!state.selected.size) { toast('Select something first'); return; }
+  syncDerived();
+  const els = cloneWithNewIds(expandForCopy(selectedEls()), 0);
+  els.forEach((e) => { if (!els.some((f) => f.id === e.frameId)) e.frameId = null; });
+  state.library.unshift({ id: uid(), name: '', created: Date.now(), elements: els, files: filesFor(els) });
+  saveLibrary(); renderLibrary();
+  $('#library').classList.add('open'); $('#libBtn').classList.add('active');
+  toast('Added to library');
+}
+function importLibrary(d) {
+  const groups = d.libraryItems ? d.libraryItems.map((i) => ({ name: i.name, elements: i.elements })) : (d.library || []).map((els) => ({ elements: els }));
+  let n = 0;
+  for (const g of groups) {
+    const els = importElements(g.elements);
+    if (!els.length) continue;
+    syncDerived(els);
+    state.library.push({ id: uid(), name: g.name || '', created: Date.now(), elements: els });
+    n++;
+  }
+  saveLibrary(); renderLibrary();
+  $('#library').classList.add('open'); $('#libBtn').classList.add('active');
+  toast(`Imported ${n} library item(s)`);
+}
+function exportLibrary() {
+  const items = state.library.map((i) => {
+    const bm = boundElementsMap(i.elements);
+    return { id: i.id, status: 'unpublished', created: i.created, name: i.name || '', elements: i.elements.map((e) => toExcalidraw(e, bm)) };
+  });
+  download('library.excalidrawlib', JSON.stringify({ type: 'excalidrawlib', version: 2, source: 'sketchboard', libraryItems: items }, null, 2), 'application/json');
+}
+
+/* ============================================================
+   Commands
+   ============================================================ */
+function setTool(tool, keepSelection = false) {
+  if (tool === 'image') { pickImage(); return; }
+  if (state.editor && tool !== state.tool) state.editor.ta.blur();
+  state.tool = tool;
+  if (tool !== 'selection' && !keepSelection) state.selected.clear();
+  document.querySelectorAll('#toolbar .tool[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
+  setCursor(tool === 'hand' ? 'grab' : tool === 'selection' ? 'default' : tool === 'text' ? 'text' : 'crosshair');
+  renderProps(); requestRender();
+}
+function toggleLock() {
+  state.locked = !state.locked;
+  const b = $('#lockBtn');
+  b.classList.toggle('active', state.locked);
+  b.innerHTML = `<i data-lucide="${state.locked ? 'lock' : 'lock-open'}"></i>`;
+  refreshIcons();
+}
+function deleteSelected() {
+  if (!state.selected.size) return;
+  deleteElements([...state.selected]);
+  state.selected.clear();
+  commit(); renderProps(); requestRender();
+}
+function selectAll() {
+  state.selected = new Set(state.elements.filter((e) => !e.containerId).map((e) => e.id));
+  setTool('selection', true);
+}
+function group() {
+  const sel = selectedEls(); if (sel.length < 2) return;
+  const g = uid(); sel.forEach((e) => e.groupIds.push(g));
+  commit(); renderProps(); requestRender();
+}
+function ungroup() {
+  const sel = selectedEls(); if (!sel.length) return;
+  sel.forEach((e) => e.groupIds.pop());
+  commit(); renderProps(); requestRender();
+}
+function reorder(kind) {
+  const isSel = (e) => state.selected.has(e.id);
+  let els = [...state.elements];
+  if (kind === 'front') els = [...els.filter((e) => !isSel(e)), ...els.filter(isSel)];
+  else if (kind === 'back') els = [...els.filter(isSel), ...els.filter((e) => !isSel(e))];
+  else if (kind === 'forward') { for (let i = els.length - 2; i >= 0; i--) if (isSel(els[i]) && !isSel(els[i + 1])) [els[i], els[i + 1]] = [els[i + 1], els[i]]; }
+  else if (kind === 'backward') { for (let i = 1; i < els.length; i++) if (isSel(els[i]) && !isSel(els[i - 1])) [els[i], els[i - 1]] = [els[i - 1], els[i]]; }
+  state.elements = els;
+  commit(); requestRender();
+}
+function setZoom(nz, sx = innerWidth / 2, sy = innerHeight / 2) {
+  nz = Math.min(30, Math.max(0.1, nz));
+  const w = toWorld(sx, sy);
+  state.view.zoom = nz;
+  state.view.x = sx / nz - w.x;
+  state.view.y = sy / nz - w.y;
+  persist(); requestRender();
+}
+function zoomToFit() {
+  const els = state.selected.size ? selectedEls() : state.elements;
+  if (!els.length) { state.view = { x: 0, y: 0, zoom: 1 }; requestRender(); return; }
+  const [x1, y1, x2, y2] = exportBounds(els);
+  const z = Math.min(3, Math.max(0.1, Math.min((innerWidth * 0.8) / Math.max(x2 - x1, 1), (innerHeight * 0.75) / Math.max(y2 - y1, 1))));
+  state.view.zoom = z;
+  state.view.x = innerWidth / 2 / z - (x1 + x2) / 2;
+  state.view.y = innerHeight / 2 / z - (y1 + y2) / 2;
+  persist(); requestRender();
+}
+function setTheme(t) {
+  state.theme = t;
+  document.body.classList.toggle('dark', t === 'dark');
+  $('#themeLabel').textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+  persist();
+}
+function resetCanvas() {
+  if (!state.elements.length || confirm('This will clear the whole canvas. Are you sure?')) {
+    state.elements = []; state.selected.clear(); shapeCache.clear();
+    commit(); renderProps(); requestRender();
+  }
+}
+function nudge(dx, dy) {
+  for (const id of moveSet()) { const e = byId(id); if (e) { e.x += dx; e.y += dy; } }
+  unbindOutside(moveSet());
+  commit(); requestRender();
+}
+function renameFrame(f) {
+  const n = prompt('Frame name', f.name || '');
+  if (n === null) return;
+  f.name = n.trim() || f.name;
+  commit(); requestRender();
+}
+
+/* ============================================================
+   UI: toolbar, properties panel, menus
+   ============================================================ */
+const refreshIcons = () => { if (window.lucide) window.lucide.createIcons(); };
+const setCursor = (c) => { canvas.style.cursor = c; };
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function buildToolbar() {
+  const tb = $('#toolbar');
+  tb.innerHTML = `<button class="tool" id="lockBtn" title="Keep selected tool active after drawing — Q"><i data-lucide="lock-open"></i></button><div class="sep"></div>` +
+    TOOLS.map((t) => `<button class="tool" data-tool="${t.id}" title="${t.title}"><i data-lucide="${t.icon}"></i>${t.key ? `<span class="key">${t.key}</span>` : ''}</button>`).join('');
+  tb.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    b.blur();
+    if (b.id === 'lockBtn') toggleLock(); else setTool(b.dataset.tool);
+  });
+}
+
+const svgI = (inner) => `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+const ICONS = {
+  hachure: svgI('<rect x="3.5" y="3.5" width="13" height="13" rx="2"/><path d="M4 12l8-8M4 16.5L16.5 4M8 16.5l8.5-8.5"/>'),
+  'cross-hatch': svgI('<rect x="3.5" y="3.5" width="13" height="13" rx="2"/><path d="M4 12l8-8M4 16.5L16.5 4M8 16.5l8.5-8.5M8 4l8.5 8.5M4 4l12.5 12.5M4 8l8.5 8.5"/>'),
+  solid: svgI('<rect x="3.5" y="3.5" width="13" height="13" rx="2" fill="currentColor"/>'),
+  sw1: svgI('<path d="M4 10h12" stroke-width="1"/>'),
+  sw2: svgI('<path d="M4 10h12" stroke-width="2.25"/>'),
+  sw4: svgI('<path d="M4 10h12" stroke-width="4"/>'),
+  ssolid: svgI('<path d="M3 10h14" stroke-width="2"/>'),
+  sdashed: svgI('<path d="M3 10h14" stroke-width="2" stroke-dasharray="4 3"/>'),
+  sdotted: svgI('<path d="M3 10h14" stroke-width="2" stroke-dasharray="0.5 3.5"/>'),
+  r0: svgI('<path d="M3 14c4-8 10-8 14 0"/>'),
+  r1: svgI('<path d="M3 14c2-5 4-8 7-5s4 1 7 5"/>'),
+  r2: svgI('<path d="M3 14c1-4 2-9 4-5s2 3 3-1 3-5 4 0 2 3 3 6"/>'),
+  sharp: svgI('<path d="M5 16V5h11"/>'),
+  round: svgI('<path d="M5 16V10a5 5 0 0 1 5-5h6"/>'),
+  aNone: svgI('<path d="M3 10h14"/>'),
+  aArrow: svgI('<path d="M3 10h14M12 5l5 5-5 5"/>'),
+  aArrowL: svgI('<path d="M17 10H3M8 5l-5 5 5 5"/>'),
+  aTri: svgI('<path d="M3 10h10"/><path d="M12 5l5 5-5 5z" fill="currentColor"/>'),
+  aTriL: svgI('<path d="M17 10H7"/><path d="M8 5l-5 5 5 5z" fill="currentColor"/>'),
+  aDot: svgI('<path d="M3 10h10"/><circle cx="14.5" cy="10" r="2.5" fill="currentColor"/>'),
+  aDotL: svgI('<path d="M17 10H7"/><circle cx="5.5" cy="10" r="2.5" fill="currentColor"/>'),
+  left: svgI('<path d="M3 5h14M3 10h9M3 15h12"/>'),
+  center: svgI('<path d="M3 5h14M5.5 10h9M4 15h12"/>'),
+  right: svgI('<path d="M3 5h14M8 10h9M5 15h12"/>'),
+  atSharp: svgI('<path d="M3 16l6-9 8 4"/>'),
+  atCurved: svgI('<path d="M3 16C5 6 12 5 17 11"/>'),
+  atElbow: svgI('<path d="M3 15h6V5h8"/><path d="M14 2.5l3 2.5-3 2.5"/>'),
+};
+// Selected elements plus the bound text of selected containers (so text props apply to it)
+function propTargets() {
+  const sel = selectedEls();
+  const out = [...sel];
+  for (const e of sel) { const t = e.boundTextId && byId(e.boundTextId); if (t) out.push(t); }
+  return out;
+}
+function curVal(prop) {
+  const t = propTargets().filter((e) => applies(e.type, prop));
+  if (t.length) {
+    if (prop === 'arrowType') return t[0].elbowed ? 'elbow' : t[0].roundness ? 'curved' : 'sharp';
+    const v = t[0][prop]; return prop === 'roundness' ? (v ? 'round' : 'sharp') : v;
+  }
+  return state.style[prop];
+}
+function ctxTypes() {
+  if (state.selected.size) return [...new Set(propTargets().map((e) => e.type))];
+  if (PROPS_BY_TYPE[state.tool]) return [state.tool];
+  return [];
+}
+function swatchRow(prop, colors) {
+  const cur = curVal(prop);
+  const isCustom = !colors.includes(cur);
+  return `<div class="row">${colors.map((c) => `<button class="swatch ${c === cur ? 'active' : ''} ${c === 'transparent' ? 'transparent' : ''}" style="${c === 'transparent' ? '' : `background:${c}`}" data-prop="${prop}" data-value="${c}" title="${c}"></button>`).join('')}
+    <span class="vsep"></span>
+    <label class="swatch custom ${isCustom ? 'active' : ''} ${cur === 'transparent' ? 'transparent' : ''}" style="${cur === 'transparent' ? '' : `background:${cur}`}" title="Custom color">
+      <input type="color" data-prop="${prop}" value="${/^#[0-9a-f]{6}$/i.test(cur) ? cur : '#ffffff'}"></label></div>`;
+}
+function optRow(prop, items) {
+  const cur = String(curVal(prop));
+  return `<div class="row">${items.map(([v, label, title]) => `<button class="opt ${String(v) === cur ? 'active' : ''}" data-prop="${prop}" data-value="${v}" title="${title}">${label}</button>`).join('')}</div>`;
+}
+const sliderRow = (prop, min, max, step) =>
+  `<div class="row slider-row"><input type="range" min="${min}" max="${max}" step="${step}" value="${curVal(prop)}" data-prop="${prop}"><span class="val" data-val-for="${prop}">${curVal(prop)}</span></div>`;
+function renderProps() {
+  const panel = $('#props');
+  const types = ctxTypes();
+  if (!types.length || state.editor) { panel.hidden = true; return; }
+  const any = (prop) => types.some((t) => applies(t, prop));
+  const sec = (title, body) => `<div class="prop-title">${title}</div>${body}`;
+  let h = '';
+  if (any('strokeColor')) h += sec('Stroke', swatchRow('strokeColor', STROKES));
+  if (any('backgroundColor')) h += sec('Background', swatchRow('backgroundColor', BGS));
+  if (any('fillStyle') && curVal('backgroundColor') !== 'transparent')
+    h += sec('Fill', optRow('fillStyle', [['hachure', ICONS.hachure, 'Hachure'], ['cross-hatch', ICONS['cross-hatch'], 'Cross-hatch'], ['solid', ICONS.solid, 'Solid']]));
+  if (any('strokeWidth'))
+    h += sec('Stroke width', optRow('strokeWidth', [[1, ICONS.sw1, 'Thin'], [2, ICONS.sw2, 'Bold'], [4, ICONS.sw4, 'Extra bold']]) + sliderRow('strokeWidth', 0.5, 20, 0.5));
+  if (any('strokeStyle')) h += sec('Stroke style', optRow('strokeStyle', [['solid', ICONS.ssolid, 'Solid'], ['dashed', ICONS.sdashed, 'Dashed'], ['dotted', ICONS.sdotted, 'Dotted']]));
+  if (any('roughness')) h += sec('Sloppiness', optRow('roughness', [[0, ICONS.r0, 'Architect'], [1, ICONS.r1, 'Artist'], [2, ICONS.r2, 'Cartoonist']]));
+  if (any('arrowType')) h += sec('Arrow type', optRow('arrowType', [['sharp', ICONS.atSharp, 'Sharp'], ['curved', ICONS.atCurved, 'Curved'], ['elbow', ICONS.atElbow, 'Elbow — routes around shapes']]));
+  if (any('roundness')) h += sec('Edges', optRow('roundness', [['sharp', ICONS.sharp, 'Sharp'], ['round', ICONS.round, 'Round']]));
+  if (any('startArrowhead')) {
+    h += sec('Arrowheads — start', optRow('startArrowhead', [[null, ICONS.aNone, 'None'], ['arrow', ICONS.aArrowL, 'Arrow'], ['triangle', ICONS.aTriL, 'Triangle'], ['dot', ICONS.aDotL, 'Dot']]));
+    h += sec('Arrowheads — end', optRow('endArrowhead', [[null, ICONS.aNone, 'None'], ['arrow', ICONS.aArrow, 'Arrow'], ['triangle', ICONS.aTri, 'Triangle'], ['dot', ICONS.aDot, 'Dot']]));
+  }
+  if (any('fontSize')) {
+    h += sec('Font size', optRow('fontSize', [[16, 'S', 'Small'], [20, 'M', 'Medium'], [28, 'L', 'Large'], [36, 'XL', 'Extra large']]));
+    h += sec('Font family', optRow('fontFamily', [[1, `<span style="font-family:${FONTS[1].replace(/"/g, "'")};font-size:16px">Aa</span>`, 'Hand-drawn'], [2, `<span style="font-family:${FONTS[2].replace(/"/g, "'")}">Aa</span>`, 'Normal'], [3, `<span style="font-family:${FONTS[3].replace(/"/g, "'")}">Aa</span>`, 'Code']]));
+    h += sec('Text align', optRow('textAlign', [['left', ICONS.left, 'Left'], ['center', ICONS.center, 'Center'], ['right', ICONS.right, 'Right']]));
+  }
+  if (any('opacity')) h += sec('Opacity', sliderRow('opacity', 0, 100, 10));
+  if (state.selected.size) {
+    h += sec('Layers', `<div class="row">
+      <button class="opt" data-action="toBack" title="Send to back (Ctrl Shift [)"><i data-lucide="arrow-down-to-line"></i></button>
+      <button class="opt" data-action="backward" title="Send backward (Ctrl [)"><i data-lucide="arrow-down"></i></button>
+      <button class="opt" data-action="forward" title="Bring forward (Ctrl ])"><i data-lucide="arrow-up"></i></button>
+      <button class="opt" data-action="toFront" title="Bring to front (Ctrl Shift ])"><i data-lucide="arrow-up-to-line"></i></button></div>`);
+    const grouped = selectedEls().some((e) => e.groupIds && e.groupIds.length);
+    h += sec('Actions', `<div class="row">
+      <button class="opt" data-action="duplicate" title="Duplicate (Ctrl D)"><i data-lucide="copy"></i></button>
+      <button class="opt" data-action="delete" title="Delete (Del)"><i data-lucide="trash-2"></i></button>
+      <button class="opt" data-action="addToLibrary" title="Add to library"><i data-lucide="book-plus"></i></button>
+      ${state.selected.size > 1 ? '<button class="opt" data-action="group" title="Group (Ctrl G)"><i data-lucide="group"></i></button>' : ''}
+      ${grouped ? '<button class="opt" data-action="ungroup" title="Ungroup (Ctrl Shift G)"><i data-lucide="ungroup"></i></button>' : ''}</div>`);
+  }
+  if (!h) { panel.hidden = true; return; }
+  panel.hidden = false;
+  panel.innerHTML = h;
+  refreshIcons();
+}
+function parseVal(v) {
+  if (v === 'null') return null;
+  const n = Number(v);
+  return v !== '' && !isNaN(n) ? n : v;
+}
+function setProp(prop, val, doCommit = true) {
+  state.style[prop] = val;
+  for (const el of propTargets()) {
+    if (!applies(el.type, prop)) continue;
+    if (prop === 'arrowType') { el.elbowed = val === 'elbow'; el.roundness = val === 'curved' ? { type: 2 } : null; delete el._rk; }
+    else if (prop === 'roundness') el.roundness = val === 'round' ? { type: el.type === 'rectangle' ? 3 : 2 } : null;
+    else el[prop] = val;
+    if (el.type === 'text' && !el.containerId) measureText(el);
+    bump(el);
+  }
+  if (doCommit) commit();
+  requestRender();
+}
+function updateFooter() {
+  $('#undoBtn').disabled = history.index <= 0;
+  $('#redoBtn').disabled = history.index >= history.stack.length - 1;
+}
+function openModal(sel) { $(sel).classList.add('open'); }
+function closeModals() { document.querySelectorAll('.backdrop.open').forEach((m) => m.classList.remove('open')); }
+function toggleLibrary(force) {
+  const open = $('#library').classList.toggle('open', force);
+  $('#libBtn').classList.toggle('active', open);
+  if (open) renderLibrary();
+}
+
+/* ============================================================
+   Action dispatcher
+   ============================================================ */
+function runAction(name) {
+  $('#menu').classList.remove('open');
+  switch (name) {
+    case 'open': $('#fileInput').click(); break;
+    case 'save': download('drawing.excalidraw', serializeScene(), 'application/json'); toast('Saved as drawing.excalidraw'); break;
+    case 'export': openExport(); break;
+    case 'insertImage': pickImage(); break;
+    case 'reset': resetCanvas(); break;
+    case 'library': toggleLibrary(); break;
+    case 'addToLibrary': addToLibrary(); break;
+    case 'importLibrary': $('#libInput').click(); break;
+    case 'exportLibrary': exportLibrary(); break;
+    case 'resetLibrary':
+      if (confirm('Replace your library with the default items?')) { state.library = defaultLibrary(); saveLibrary(); renderLibrary(); }
+      break;
+    case 'grid': state.grid = !state.grid; persist(); requestRender(); break;
+    case 'theme': setTheme(state.theme === 'dark' ? 'light' : 'dark'); break;
+    case 'help': openModal('#helpModal'); break;
+    case 'about': closeModals(); openModal('#aboutModal'); break;
+    case 'zoomIn': setZoom(state.view.zoom * 1.2); break;
+    case 'zoomOut': setZoom(state.view.zoom / 1.2); break;
+    case 'zoomReset': setZoom(1); break;
+    case 'undo': undo(); break;
+    case 'redo': redo(); break;
+    case 'toBack': reorder('back'); break;
+    case 'backward': reorder('backward'); break;
+    case 'forward': reorder('forward'); break;
+    case 'toFront': reorder('front'); break;
+    case 'duplicate': duplicateSelected(); commit(); renderProps(); requestRender(); break;
+    case 'delete': deleteSelected(); break;
+    case 'group': group(); break;
+    case 'ungroup': ungroup(); break;
+    case 'exportPng': { const o = exportOpts(); const c = renderToCanvas(exportElements(o.onlySelected), o); if (c) c.toBlob((b) => download('drawing.png', b)); break; }
+    case 'exportSvg': { const s = renderExportSvg(exportOpts()); if (s) download('drawing.svg', s, 'image/svg+xml'); break; }
+    case 'copyPng': {
+      const o = exportOpts(); const c = renderToCanvas(exportElements(o.onlySelected), o);
+      if (!c) break;
+      c.toBlob(async (b) => {
+        try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); toast('Copied PNG to clipboard'); }
+        catch { toast('Clipboard not available in this browser'); }
+      });
+      break;
+    }
+  }
+}
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-action]');
+  if (a) { if (a.tagName === 'A') e.preventDefault(); a.blur(); runAction(a.dataset.action); return; }
+  if (e.target.closest('[data-close]') || e.target.classList.contains('backdrop')) closeModals();
+});
+$('#menuBtn').addEventListener('click', (e) => { e.currentTarget.blur(); $('#menu').classList.toggle('open'); });
+$('#props').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-prop]'); if (!b) return;
+  b.blur();
+  setProp(b.dataset.prop, parseVal(b.dataset.value));
+  renderProps();
+});
+$('#props').addEventListener('input', (e) => {
+  const i = e.target.closest('input[data-prop]'); if (!i) return;
+  const prop = i.dataset.prop;
+  setProp(prop, i.type === 'range' ? +i.value : i.value, false);
+  if (i.type === 'range') { const v = $(`[data-val-for="${prop}"]`); if (v) v.textContent = i.value; }
+  else i.parentElement.style.background = i.value;
+});
+$('#props').addEventListener('change', (e) => { if (e.target.matches('input[data-prop]')) { commit(); renderProps(); } });
+['#expBg', '#expDark', '#expSel', '#expScale'].forEach((s) => $(s).addEventListener('change', updateExportPreview));
+$('#fileInput').addEventListener('change', async (e) => { const f = e.target.files[0]; if (f) loadScene(await f.text()); e.target.value = ''; });
+$('#imageInput').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) insertImage(f, viewCenter()); e.target.value = ''; });
+$('#libInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (f) { try { importLibrary(JSON.parse(await f.text())); } catch (err) { toast('Invalid library file'); } }
+  e.target.value = '';
+});
+
+/* ============================================================
+   Pointer interaction
+   ============================================================ */
+function startHandleAction(h, p) {
+  const sel = selectedEls();
+  if (h.kind === 'point' || h.kind === 'mid') {
+    const el = sel[0];
+    let index = h.index;
+    if (h.kind === 'mid') {
+      const a = el.points[index], b = el.points[index + 1];
+      el.points.splice(index + 1, 0, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+      index += 1; bump(el);
+    }
+    const endpoint = h.kind === 'point' && (index === 0 || index === el.points.length - 1);
+    if (endpoint && el.type === 'arrow') { if (index === 0) el.startBinding = null; else el.endBinding = null; }
+    action = { type: 'point', el, index, endpoint, orig: clone(el) };
+    return;
+  }
+  const orig = new Map(sel.map((el) => [el.id, clone(el)]));
+  unbindOutside(new Set(orig.keys()));
+  const f = frame(sel);
+  if (h.kind === 'rotate') {
+    action = { type: 'rotate', orig, cx: f.cx, cy: f.cy, startAng: Math.atan2(p.y - f.cy, p.x - f.cx) };
+    setCursor('grabbing');
+  } else {
+    const startL = f.angle ? rotPt(p.x, p.y, f.cx, f.cy, -f.angle) : [p.x, p.y];
+    action = { type: 'resize', orig, frame: f, handle: h.handle, startL, single: sel.length === 1,
+      keepRatio: sel.every((e) => e.type === 'text' || e.type === 'image'), hasFrame: sel.some((e) => e.type === 'frame') };
+  }
+}
+canvas.addEventListener('pointerdown', (e) => {
+  $('#menu').classList.remove('open');
+  if (state.editor) { state.editor.ta.blur(); return; }
+  canvas.setPointerCapture(e.pointerId);
+  const p = toWorld(e.clientX, e.clientY);
+  lastPointer = p;
+  if (e.button === 1 || (e.button === 0 && (state.space || state.tool === 'hand'))) {
+    action = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: state.view.x, vy: state.view.y };
+    setCursor('grabbing');
+    return;
+  }
+  if (e.button !== 0) return;
+  const tool = state.tool;
+
+  if (tool === 'selection') {
+    const h = hitHandle(p);
+    if (h) { startHandleAction(h, p); requestRender(); return; }
+    const hit = elementAt(p);
+    if (hit) {
+      const ids = groupMembers(hit);
+      if (e.shiftKey) {
+        if (state.selected.has(hit.id)) ids.forEach((id) => state.selected.delete(id));
+        else ids.forEach((id) => state.selected.add(id));
+      } else if (!state.selected.has(hit.id)) state.selected = new Set(ids);
+      if (e.altKey && state.selected.size) duplicateSelected(0);
+      const ids2 = moveSet();
+      unbindOutside(ids2);
+      action = { type: 'move', start: p, orig: new Map([...ids2].map((id) => { const el = byId(id); return [id, { x: el.x, y: el.y }]; })) };
+    } else {
+      if (!e.shiftKey) state.selected.clear();
+      action = { type: 'box', start: p, cur: p, base: new Set(state.selected) };
+    }
+    renderProps(); requestRender();
+    return;
+  }
+  if (tool === 'eraser') { action = { type: 'erase' }; eraseAt(p); requestRender(); return; }
+  if (tool === 'text') {
+    e.preventDefault();
+    const hit = elementAt(p);
+    if (hit && hit.type === 'text') { editText(hit); return; }
+    if (hit && isLinear(hit)) { editBound(hit); return; }
+    const c = containerAt(p);
+    if (c) { editBound(c); return; }
+    const el = createElement('text', snapPt(p));
+    el.y -= (el.fontSize * LINE_H) / 2;
+    state.elements.push(el);
+    updateFrameMembership([el]);
+    editText(el, true);
+    return;
+  }
+  const start = tool === 'freedraw' ? p : snapPt(p);
+  const el = createElement(tool, start);
+  if (tool === 'freedraw') { el.simulatePressure = e.pointerType !== 'pen'; el.pressures = [e.pressure || 0.5]; }
+  if (tool === 'arrow') { const t = findBindTarget(p); if (t) el.startBinding = makeBinding(t, p); }
+  if (tool === 'frame') state.elements.unshift(el); else state.elements.push(el);
+  state.selected.clear();
+  action = { type: 'create', el, start, cur: p };
+  renderProps(); requestRender();
+});
+canvas.addEventListener('pointermove', (e) => {
+  const p = toWorld(e.clientX, e.clientY);
+  lastPointer = p;
+  if (!action) { updateCursor(p); return; }
+  switch (action.type) {
+    case 'pan': {
+      const z = state.view.zoom;
+      state.view.x = action.vx + (e.clientX - action.sx) / z;
+      state.view.y = action.vy + (e.clientY - action.sy) / z;
+      break;
+    }
+    case 'create': updateCreate(action, p, e); break;
+    case 'move': {
+      let dx = p.x - action.start.x, dy = p.y - action.start.y;
+      if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+      const first = action.orig.values().next().value;
+      if (state.grid && first) { dx = snap(first.x + dx) - first.x; dy = snap(first.y + dy) - first.y; }
+      for (const [id, o] of action.orig) { const el = byId(id); if (el) { el.x = o.x + dx; el.y = o.y + dy; } }
+      break;
+    }
+    case 'resize': doResize(action, p, e.shiftKey); break;
+    case 'rotate': doRotate(action, p, e.shiftKey); break;
+    case 'point': doPoint(action, p, e.shiftKey); break;
+    case 'box': {
+      action.cur = p;
+      const x1 = Math.min(action.start.x, p.x), x2 = Math.max(action.start.x, p.x), y1 = Math.min(action.start.y, p.y), y2 = Math.max(action.start.y, p.y);
+      state.selected = new Set(action.base);
+      for (const el of state.elements) {
+        if (el.containerId) continue;
+        const b = getBounds(el);
+        if (b[0] >= x1 && b[2] <= x2 && b[1] >= y1 && b[3] <= y2) groupMembers(el).forEach((id) => state.selected.add(id));
+      }
+      break;
+    }
+    case 'erase': eraseAt(p); break;
+  }
+  requestRender();
+});
+function endPointer() {
+  if (!action) return;
+  const a = action;
+  action = null;
+  switch (a.type) {
+    case 'pan': persist(); break;
+    case 'create': {
+      const el = a.el;
+      if (el.type === 'arrow' && state.bindHint && a.cur) el.endBinding = makeBinding(state.bindHint, a.cur);
+      const tooSmall = isLinear(el)
+        ? Math.hypot(...el.points[el.points.length - 1]) < 3
+        : el.type === 'freedraw' ? false : Math.abs(el.width) < 3 && Math.abs(el.height) < 3;
+      if (tooSmall) state.elements = state.elements.filter((x) => x !== el);
+      else {
+        normalize(el);
+        updateFrameMembership(el.type === 'frame' ? state.elements : [el]);
+        if (el.type !== 'freedraw') {
+          state.selected = new Set([el.id]);
+          if (!state.locked) setTool('selection', true);
+        }
+        commit();
+      }
+      break;
+    }
+    case 'point':
+      if (a.endpoint && a.el.type === 'arrow' && state.bindHint && a.cur) {
+        a.el[a.index === 0 ? 'startBinding' : 'endBinding'] = makeBinding(state.bindHint, a.cur);
+      }
+      normalize(a.el);
+      commit();
+      break;
+    case 'move': {
+      const moved = [...a.orig.keys()].map(byId).filter(Boolean);
+      updateFrameMembership(moved.filter((m) => !(m.frameId && a.orig.has(m.frameId))));
+      commit();
+      break;
+    }
+    case 'resize': case 'rotate': {
+      const els = [...a.orig.keys()].map(byId).filter(Boolean);
+      els.forEach(normalize);
+      updateFrameMembership(a.hasFrame ? state.elements : els);
+      commit();
+      break;
+    }
+    case 'erase':
+      deleteElements(state.elements.filter((x) => x._erasing).map((x) => x.id));
+      commit();
+      break;
+  }
+  state.bindHint = null;
+  updateCursor(lastPointer);
+  renderProps(); requestRender();
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('dblclick', (e) => {
+  if (state.tool !== 'selection') return;
+  const p = toWorld(e.clientX, e.clientY);
+  const hit = elementAt(p);
+  if (hit) {
+    if (hit.type === 'text') { editText(hit); return; }
+    if (CONTAINERS.includes(hit.type) || isLinear(hit)) { editBound(hit); return; }
+    if (hit.type === 'frame') { renameFrame(hit); return; }
+    if (hit.type === 'image' || hit.type === 'freedraw') return;
+  }
+  const c = containerAt(p);
+  if (c) { editBound(c); return; }
+  const el = createElement('text', snapPt(p));
+  el.y -= (el.fontSize * LINE_H) / 2;
+  state.elements.push(el);
+  updateFrameMembership([el]);
+  editText(el, true);
+});
+const RESIZE_CURSORS = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
+function updateCursor(p) {
+  if (state.space || state.tool === 'hand') return setCursor('grab');
+  if (state.tool === 'selection') {
+    const h = hitHandle(p);
+    if (h) return setCursor(h.kind === 'rotate' ? 'grab' : h.kind === 'resize' ? RESIZE_CURSORS[h.handle] : 'pointer');
+    return setCursor(elementAt(p) ? 'move' : 'default');
+  }
+  setCursor(state.tool === 'text' ? 'text' : state.tool === 'eraser' ? 'cell' : 'crosshair');
+}
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) setZoom(state.view.zoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY);
+  else {
+    const z = state.view.zoom;
+    if (e.shiftKey && !e.deltaX) state.view.x -= e.deltaY / z;
+    else { state.view.x -= e.deltaX / z; state.view.y -= e.deltaY / z; }
+    persist(); requestRender();
+  }
+}, { passive: false });
+
+/* ============================================================
+   Keyboard & clipboard
+   ============================================================ */
+window.addEventListener('keydown', (e) => {
+  if (e.target.closest && e.target.closest('textarea, input, select')) return;
+  const mod = e.ctrlKey || e.metaKey;
+  const k = e.key.toLowerCase();
+  if (e.key === ' ') { if (!state.space) { state.space = true; setCursor('grab'); } e.preventDefault(); return; }
+  if (e.key === 'Escape') {
+    if (document.querySelector('.backdrop.open')) { closeModals(); return; }
+    $('#menu').classList.remove('open');
+    state.selected.clear(); setTool('selection'); return;
+  }
+  if (document.querySelector('.backdrop.open')) return;
+  if (mod) {
+    if (k === 'z') e.shiftKey ? redo() : undo();
+    else if (k === 'y') redo();
+    else if (k === 'd') { duplicateSelected(); commit(); renderProps(); requestRender(); }
+    else if (k === 'a') selectAll();
+    else if (k === 's') runAction('save');
+    else if (k === 'o') runAction('open');
+    else if (k === 'e' && e.shiftKey) runAction('export');
+    else if (k === 'g') e.shiftKey ? ungroup() : group();
+    else if (k === '=' || k === '+') setZoom(state.view.zoom * 1.2);
+    else if (k === '-' || k === '_') setZoom(state.view.zoom / 1.2);
+    else if (k === '0') setZoom(1);
+    else if (e.code === 'BracketRight') reorder(e.shiftKey ? 'front' : 'forward');
+    else if (e.code === 'BracketLeft') reorder(e.shiftKey ? 'back' : 'backward');
+    else if (e.key === "'") runAction('grid');
+    else return;
+    e.preventDefault();
+    return;
+  }
+  if (e.altKey && e.shiftKey && e.code === 'KeyD') { runAction('theme'); e.preventDefault(); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); e.preventDefault(); return; }
+  if (e.key.startsWith('Arrow') && state.selected.size) {
+    const s = e.shiftKey ? 10 : 1;
+    nudge(e.key === 'ArrowLeft' ? -s : e.key === 'ArrowRight' ? s : 0, e.key === 'ArrowUp' ? -s : e.key === 'ArrowDown' ? s : 0);
+    e.preventDefault(); return;
+  }
+  if (e.key === 'Enter') {
+    const sel = selectedEls();
+    if (sel.length === 1) {
+      const el = sel[0];
+      if (el.type === 'text') { editText(el); e.preventDefault(); }
+      else if (CONTAINERS.includes(el.type) || isLinear(el)) { editBound(el); e.preventDefault(); }
+      else if (el.type === 'frame') { renameFrame(el); e.preventDefault(); }
+    }
+    return;
+  }
+  if (e.shiftKey && e.code === 'Digit1') { zoomToFit(); return; }
+  if (e.key === '?') { openModal('#helpModal'); return; }
+  if (e.altKey) return;
+  if (k === 'q') { toggleLock(); return; }
+  if (KEYMAP[k] !== undefined && !e.shiftKey) setTool(KEYMAP[k]);
+});
+window.addEventListener('keyup', (e) => { if (e.key === ' ') { state.space = false; updateCursor(lastPointer); } });
+
+function clipboardPayload() {
+  syncDerived();
+  const els = expandForCopy(selectedEls());
+  const bm = boundElementsMap(els);
+  return JSON.stringify({ type: 'excalidraw/clipboard', elements: els.map((x) => toExcalidraw(x, bm)), files: filesFor(els) });
+}
+const editingField = (e) => state.editor || (e.target.closest && e.target.closest('textarea, input'));
+document.addEventListener('copy', (e) => {
+  if (editingField(e) || !state.selected.size) return;
+  e.clipboardData.setData('text/plain', clipboardPayload());
+  e.preventDefault();
+  toast('Copied');
+});
+document.addEventListener('cut', (e) => {
+  if (editingField(e) || !state.selected.size) return;
+  e.clipboardData.setData('text/plain', clipboardPayload());
+  e.preventDefault();
+  deleteSelected();
+});
+document.addEventListener('paste', (e) => {
+  if (editingField(e)) return;
+  const img = [...(e.clipboardData.files || [])].find((f) => f.type.startsWith('image/'));
+  if (img) { e.preventDefault(); insertImage(img, lastPointer); return; }
+  const text = e.clipboardData.getData('text/plain');
+  if (!text) return;
+  e.preventDefault();
+  let els = null;
+  try {
+    const d = JSON.parse(text);
+    if (d && /^excalidraw|sketchboard/.test(d.type) && Array.isArray(d.elements)) { addFiles(d.files); els = importElements(d.elements); }
+  } catch { /* plain text */ }
+  if (els && els.length) { insertElements(els, lastPointer); return; }
+  const el = createElement('text', lastPointer);
+  el.text = el.originalText = text; measureText(el);
+  state.elements.push(el);
+  state.selected = new Set([el.id]);
+  updateFrameMembership([el]);
+  setTool('selection', true);
+  commit(); renderProps(); requestRender();
+});
+
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  const p = toWorld(e.clientX, e.clientY);
+  const libId = e.dataTransfer.getData('application/x-sketchboard-lib');
+  if (libId) {
+    const item = state.library.find((i) => i.id === libId);
+    if (item) insertElements(importElements(clone(item.elements)), p);
+    return;
+  }
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  if (f.type.startsWith('image/')) insertImage(f, p);
+  else if (/\.(excalidraw|excalidrawlib|json)$/i.test(f.name)) loadScene(await f.text());
+});
+window.addEventListener('resize', resize);
+window.addEventListener('beforeunload', () => {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sceneState())); } catch { /* ignore */ }
+});
+
+/* ============================================================
+   Boot
+   ============================================================ */
+buildToolbar();
+loadLocal();
+loadLibrary();
+cleanup(); syncDerived();
+history.stack = [snapshot()]; history.index = 0;
+setTool('selection');
+updateFooter();
+refreshIcons();
+resize();
+idb.all().then((files) => { for (const [id, f] of Object.entries(files)) if (!state.files[id]) state.files[id] = f; requestRender(); });
+Promise.allSettled([document.fonts.load('20px Virgil'), document.fonts.load('20px Caveat'), document.fonts.load('600 14px Nunito')]).then(() => {
+  const refresh = (els) => els.forEach((el) => { if (el.type === 'text') { if (el.containerId) delete el._wk; else measureText(el); bump(el); } });
+  refresh(state.elements);
+  state.library.forEach((i) => refresh(i.elements));
+  if ($('#library').classList.contains('open')) renderLibrary();
+  requestRender();
+});
+</script>
+</body>
+</html>
