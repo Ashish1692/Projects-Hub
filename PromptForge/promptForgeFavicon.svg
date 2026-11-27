@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Dark Forge Canvas Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F0C1B" />
+      <stop offset="100%" stop-color="#1D122C" />
+    </linearGradient>
+
+    <!-- Ember & Gold Spark Gradient -->
+    <linearGradient id="forgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF4500" />
+      <stop offset="50%" stop-color="#FF8C00" />
+      <stop offset="100%" stop-color="#FFD700" />
+    </linearGradient>
+
+    <!-- Heat Aura Behind Emblem -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF6B00" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#FF6B00" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Ember Drop Shadow -->
+    <filter id="emberShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#FF4500" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Container Base -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Ambient Heat Halo -->
+  <circle cx="256" cy="256" r="200" fill="url(#glowGrad)" />
+
+  <!-- Prompt Chevron '>' -->
+  <path d="M144 152 L264 256 L144 360" 
+        fill="none" 
+        stroke="url(#forgeGrad)" 
+        stroke-width="44" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        filter="url(#emberShadow)" />
+
+  <!-- Prompt Cursor / Anvil Line '_' -->
+  <line x1="280" y1="360" x2="368" y2="360" 
+        stroke="url(#forgeGrad)" 
+        stroke-width="44" 
+        stroke-linecap="round" 
+        filter="url(#emberShadow)" />
+
+  <!-- Forge Spark 1 (Primary Starburst) -->
+  <path d="M360 120 C360 140 370 150 390 150 C370 150 360 160 360 180 C360 160 350 150 330 150 C350 150 360 140 360 120 Z" 
+        fill="#FFD700" />
+
+  <!-- Forge Sparks 2 & 3 (Ember Accents) -->
+  <circle cx="416" cy="200" r="10" fill="#FF8C00" />
+  <circle cx="310" cy="110" r="6" fill="#FF4500" />
+</svg>

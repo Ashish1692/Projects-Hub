@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prompt Engineering Techniques — Interactive Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d14;
+  --bg2:#10131d;
+  --panel:#141826;
+  --panel2:#1a1f30;
+  --line:#252b40;
+  --line2:#30374f;
+  --text:#e7e9f2;
+  --muted:#9aa1b8;
+  --dim:#6b7290;
+  --accent:#8b7cff;
+  --accent2:#5ed6c4;
+  --glow:rgba(139,124,255,.18);
+  --radius:18px;
+  --low:#5ed6c4; --med:#6fa8ff; --high:#f5b754; --expert:#f27a9b; --complex:#b48cff;
+  --sb-w:300px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);color:var(--text);font-size:15px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;overflow:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgba(139,124,255,.13), transparent 60%),
+    radial-gradient(700px 400px at 10% 110%, rgba(94,214,196,.08), transparent 60%);
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#262c42;border-radius:10px;border:3px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:#343b57;background-clip:padding-box;border:3px solid transparent}
+
+.app{position:relative;z-index:1;display:flex;height:100vh}
+
+/* ---------- Sidebar ---------- */
+.sidebar{
+  width:var(--sb-w);flex-shrink:0;height:100%;
+  background:linear-gradient(180deg,var(--bg2),#0d1019);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;
+  transition:width .35s var(--ease), transform .35s var(--ease);
+  overflow:hidden;
+}
+.app.collapsed .sidebar{width:76px}
+.sb-head{padding:20px 18px 14px;display:flex;align-items:center;gap:12px;min-height:72px}
+.logo{
+  width:40px;height:40px;border-radius:12px;flex-shrink:0;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0b0d14;font-weight:800;font-size:18px;
+  box-shadow:0 8px 24px var(--glow);
+}
+.brand{white-space:nowrap;overflow:hidden;transition:opacity .2s}
+.brand b{display:block;font-size:15px;letter-spacing:-.01em}
+.brand span{font-size:12px;color:var(--muted)}
+.app.collapsed .brand,.app.collapsed .sb-search,.app.collapsed .sb-progress,.app.collapsed .cat-head .cat-label,
+.app.collapsed .cat-head .chev,.app.collapsed .cat-head .cat-count,.app.collapsed .nav-item .nm,.app.collapsed .nav-item .ck{opacity:0;pointer-events:none}
+.app.collapsed .sb-search,.app.collapsed .sb-progress{display:none}
+.sb-search{margin:0 16px 12px;position:relative;transition:opacity .2s}
+.sb-search input{
+  width:100%;padding:10px 12px 10px 36px;border-radius:12px;border:1px solid var(--line);
+  background:var(--panel);color:var(--text);font:inherit;font-size:13.5px;outline:none;transition:border .2s, box-shadow .2s;
+}
+.sb-search input:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--glow)}
+.sb-search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--dim)}
+.sb-progress{margin:0 16px 10px;padding:12px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);transition:opacity .2s}
+.sb-progress .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
+.sb-progress .row b{color:var(--text)}
+.bar{height:6px;border-radius:6px;background:#22283b;overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .5s var(--ease)}
+
+.nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 10px 16px}
+.cat{margin-bottom:4px}
+.cat-head{
+  width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;
+  color:var(--muted);font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;transition:background .2s,color .2s;
+}
+.cat-head:hover{background:var(--panel);color:var(--text)}
+.cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-left:6px}
+.cat-label{flex:1;text-align:left;white-space:nowrap;transition:opacity .2s}
+.cat-count{font-size:11px;background:var(--panel2);padding:1px 8px;border-radius:20px;letter-spacing:0;transition:opacity .2s}
+.chev{transition:transform .3s var(--ease), opacity .2s}
+.cat.closed .chev{transform:rotate(-90deg)}
+.cat-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .35s var(--ease)}
+.cat.closed .cat-body{grid-template-rows:0fr}
+.cat-body>div{overflow:hidden}
+.app.collapsed .cat-body{grid-template-rows:1fr}
+.nav-item{
+  width:100%;display:flex;align-items:center;gap:12px;padding:9px 10px;margin:2px 0;border-radius:12px;
+  color:var(--muted);font-size:14px;text-align:left;position:relative;transition:background .2s,color .2s;
+}
+.nav-item:hover{background:var(--panel);color:var(--text)}
+.nav-item.active{background:linear-gradient(90deg,rgba(139,124,255,.18),rgba(139,124,255,.04));color:var(--text)}
+.nav-item.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--accent)}
+.num{
+  width:30px;height:30px;flex-shrink:0;border-radius:9px;display:grid;place-items:center;font-size:12px;font-weight:700;
+  background:var(--panel2);border:1px solid var(--line);transition:all .2s;
+}
+.nav-item.active .num{background:var(--accent);color:#0b0d14;border-color:transparent}
+.nav-item.done .num{border-color:var(--accent2);color:var(--accent2)}
+.nav-item.active.done .num{color:#0b0d14}
+.nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .2s}
+.ck{width:16px;height:16px;color:var(--accent2);opacity:0;transition:opacity .2s}
+.nav-item.done .ck{opacity:1}
+.app.collapsed .nav-item.done .ck{opacity:0}
+.empty-nav{padding:20px;color:var(--dim);font-size:13px;text-align:center;display:none}
+
+.sb-foot{padding:12px 16px;border-top:1px solid var(--line)}
+.collapse-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px;border-radius:12px;
+  color:var(--muted);font-size:13px;background:var(--panel);border:1px solid var(--line);transition:all .2s;white-space:nowrap;
+}
+.collapse-btn:hover{color:var(--text);border-color:var(--line2)}
+.collapse-btn svg{transition:transform .35s var(--ease);flex-shrink:0}
+.app.collapsed .collapse-btn svg{transform:rotate(180deg)}
+.app.collapsed .collapse-btn span{display:none}
+
+/* ---------- Main ---------- */
+.main{flex:1;height:100%;overflow-y:auto;scroll-behavior:smooth}
+.topbar{
+  position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:14px 28px;
+  background:rgba(11,13,20,.72);backdrop-filter:blur(14px);border-bottom:1px solid rgba(37,43,64,.6);
+}
+.menu-btn{display:none;width:38px;height:38px;border-radius:10px;place-items:center;background:var(--panel);border:1px solid var(--line)}
+.crumb{font-size:13px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb b{color:var(--text);font-weight:600}
+.kbd{font-family:"JetBrains Mono",monospace;font-size:11px;padding:2px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.hint{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px}
+
+.content{width:80%;max-width:1200px;margin:28px auto 60px}
+.card{
+  background:linear-gradient(180deg,rgba(26,31,48,.85),rgba(20,24,38,.85));
+  border:1px solid var(--line);border-radius:var(--radius);padding:30px 32px;margin-bottom:20px;
+  box-shadow:0 20px 50px -20px rgba(0,0,0,.6);
+}
+.fade{animation:fadeUp .5s var(--ease) both}
+.fade:nth-child(2){animation-delay:.06s}.fade:nth-child(3){animation-delay:.12s}.fade:nth-child(4){animation-delay:.18s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+.hero{position:relative;overflow:hidden}
+.hero::after{
+  content:"";position:absolute;right:-80px;top:-80px;width:260px;height:260px;border-radius:50%;
+  background:radial-gradient(circle,var(--hero-c,rgba(139,124,255,.25)),transparent 70%);pointer-events:none;
+}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:30px;font-size:12px;font-weight:600;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.pill i{width:7px;height:7px;border-radius:50%}
+.hero h1{font-size:34px;line-height:1.15;letter-spacing:-.025em;margin:14px 0 6px;font-weight:800}
+.tagline{color:var(--accent2);font-weight:500;margin-bottom:18px}
+.hero p{color:#c7cbdc;font-size:15.5px;max-width:880px}
+.hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:600;
+  background:var(--panel2);border:1px solid var(--line);transition:all .2s var(--ease);
+}
+.btn:hover{border-color:var(--line2);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),#6d5cf0);border-color:transparent;color:#fff;box-shadow:0 8px 22px var(--glow)}
+.btn.primary.on{background:linear-gradient(135deg,#2a8f80,var(--accent2));color:#07211d}
+
+.sec-title{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.sec-ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);color:var(--accent)}
+.sec-title h2{font-size:18px;letter-spacing:-.01em}
+.sec-title small{display:block;color:var(--muted);font-size:12.5px;font-weight:400}
+
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.key{
+  display:flex;gap:12px;padding:14px 16px;border-radius:14px;background:rgba(11,13,20,.45);border:1px solid var(--line);
+  transition:border-color .2s, transform .2s;
+}
+.key:hover{border-color:var(--line2);transform:translateY(-2px)}
+.key .kn{flex-shrink:0;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-size:12px;font-weight:700;background:rgba(139,124,255,.14);color:var(--accent)}
+.key b{display:block;font-size:14px;margin-bottom:2px}
+.key span{color:var(--muted);font-size:13.5px}
+
+/* examples header */
+.ex-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.seg{display:inline-flex;padding:4px;border-radius:12px;background:rgba(11,13,20,.55);border:1px solid var(--line);position:relative}
+.seg button{position:relative;z-index:1;padding:7px 14px;font-size:13px;font-weight:600;color:var(--muted);border-radius:9px;transition:color .25s;display:flex;align-items:center;gap:6px}
+.seg button.on{color:var(--text)}
+.seg .slider{position:absolute;top:4px;bottom:4px;border-radius:9px;background:var(--panel2);border:1px solid var(--line2);transition:all .35s var(--ease)}
+
+/* tabs */
+.tabs{display:flex;gap:6px;padding:5px;border-radius:14px;background:rgba(11,13,20,.55);border:1px solid var(--line);position:relative;overflow-x:auto}
+.tab{
+  flex:1;min-width:110px;position:relative;z-index:1;padding:10px 12px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--muted);
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:color .25s;
+}
+.tab i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.tab.on{color:var(--text)}
+.tab-ind{position:absolute;top:5px;bottom:5px;border-radius:10px;background:var(--panel2);border:1px solid var(--line2);transition:all .35s var(--ease);box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.tab-ind::after{content:"";position:absolute;left:20%;right:20%;bottom:-1px;height:2px;border-radius:2px;background:var(--ind-c,var(--accent));transition:background .3s}
+.tab-panel{margin-top:16px;animation:fadeUp .4s var(--ease) both}
+
+.ex{border-radius:14px;border:1px solid var(--line);background:rgba(11,13,20,.4);overflow:hidden}
+.ex-meta{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.lvl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:20px;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.ex-meta h3{font-size:15px;font-weight:600;flex:1}
+.copy{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);padding:6px 10px;border-radius:9px;border:1px solid var(--line);background:var(--panel);transition:all .2s}
+.copy:hover{color:var(--text);border-color:var(--line2)}
+.copy.ok{color:var(--accent2);border-color:var(--accent2)}
+pre.prompt{
+  margin:0;padding:18px 20px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.7;
+  white-space:pre-wrap;word-break:break-word;color:#d6d9e8;background:#0a0c13;max-height:440px;overflow:auto;
+}
+pre.prompt .hl{color:var(--accent2)}
+pre.prompt .tg{color:#b9a8ff}
+.why{display:flex;gap:12px;padding:14px 18px;border-top:1px solid var(--line);font-size:13.5px;color:#c7cbdc;background:rgba(139,124,255,.04)}
+.why svg{flex-shrink:0;color:var(--high);margin-top:2px}
+.why b{color:var(--text)}
+
+/* accordion */
+.acc{display:flex;flex-direction:column;gap:10px}
+.acc-item{border-radius:14px;border:1px solid var(--line);background:rgba(11,13,20,.4);overflow:hidden;transition:border-color .25s}
+.acc-item.open{border-color:var(--line2)}
+.acc-btn{width:100%;display:flex;align-items:center;gap:12px;padding:15px 18px;text-align:left;transition:background .2s}
+.acc-btn:hover{background:rgba(255,255,255,.02)}
+.acc-btn h3{flex:1;font-size:14.5px;font-weight:600}
+.acc-btn .chev{color:var(--muted)}
+.acc-item:not(.open) .acc-btn .chev{transform:rotate(-90deg)}
+.acc-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--ease)}
+.acc-item.open .acc-body{grid-template-rows:1fr}
+.acc-body>div{overflow:hidden}
+.acc-inner{border-top:1px solid var(--line)}
+.acc-tools{display:flex;justify-content:flex-end;padding:10px 14px 0;background:#0a0c13}
+
+.pager{display:flex;gap:14px}
+.pg{
+  flex:1;display:flex;flex-direction:column;gap:2px;padding:16px 20px;border-radius:16px;background:var(--panel);border:1px solid var(--line);
+  transition:all .25s var(--ease);text-align:left;
+}
+.pg:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 10px 30px -10px var(--glow)}
+.pg small{font-size:12px;color:var(--muted)}
+.pg b{font-size:15px}
+.pg.next{text-align:right;align-items:flex-end}
+.pg[disabled]{opacity:.35;pointer-events:none}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;padding:10px 18px;border-radius:12px;background:var(--panel2);border:1px solid var(--line2);font-size:13px;transition:all .3s var(--ease);z-index:50;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.scrim{display:none}
+
+@media (max-width:980px){
+  .content{width:92%}
+}
+@media (max-width:780px){
+  .sidebar{position:fixed;left:0;top:0;z-index:40;transform:translateX(-100%);width:var(--sb-w)!important;box-shadow:20px 0 60px rgba(0,0,0,.5)}
+  .app.mobile-open .sidebar{transform:none}
+  .app.collapsed .brand,.app.collapsed .sb-search,.app.collapsed .sb-progress,.app.collapsed .cat-head .cat-label,.app.collapsed .cat-head .chev,.app.collapsed .cat-head .cat-count,.app.collapsed .nav-item .nm,.app.collapsed .nav-item .ck{opacity:1;pointer-events:auto}
+  .sb-foot{display:none}
+  .menu-btn{display:grid}
+  .hint{display:none}
+  .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:30;opacity:0;pointer-events:none;transition:opacity .3s}
+  .app.mobile-open .scrim{opacity:1;pointer-events:auto}
+  .content{width:94%;margin-top:18px}
+  .card{padding:22px 18px}
+  .hero h1{font-size:26px}
+  .topbar{padding:12px 16px}
+  .tab{min-width:92px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="sb-head">
+      <div class="logo">P</div>
+      <div class="brand"><b>Prompt Academy</b><span>18 techniques · 90 examples</span></div>
+    </div>
+    <div class="sb-search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="text" placeholder="Search techniques…  ( / )" autocomplete="off">
+    </div>
+    <div class="sb-progress">
+      <div class="row"><span>Your progress</span><b id="progTxt">0 / 18</b></div>
+      <div class="bar"><i id="progBar"></i></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="empty-nav" id="emptyNav">No technique matches.</div>
+    <div class="sb-foot">
+      <button class="collapse-btn" id="collapseBtn" title="Collapse sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        <span>Collapse sidebar</span>
+      </button>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <main class="main" id="main">
+    <div class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="crumb" id="crumb"></div>
+      <div class="hint"><span class="kbd">←</span><span class="kbd">→</span> technique <span class="kbd">1</span>–<span class="kbd">5</span> level</div>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   DATA — 18 techniques (from IBM Think: Prompt engineering techniques)
+   ============================================================ */
+const CATS = {
+  found:  {name:"Foundations",            color:"#5ed6c4"},
+  reason: {name:"Reasoning",              color:"#8b7cff"},
+  iter:   {name:"Iterate & Self-Improve", color:"#f5b754"},
+  tools:  {name:"Tools & Grounding",      color:"#f27a9b"},
+  struct: {name:"Structure & Modality",   color:"#6fa8ff"}
+};
+const LEVELS = [
+  {k:"low",     label:"Low",     c:"var(--low)"},
+  {k:"med",     label:"Medium",  c:"var(--med)"},
+  {k:"high",    label:"High",    c:"var(--high)"},
+  {k:"expert",  label:"Expert",  c:"var(--expert)"},
+  {k:"complex", label:"Complex", c:"var(--complex)"}
+];
+
+const T = [
+/* ---------------- 1. ZERO-SHOT ---------------- */
+{
+ id:"zero-shot", cat:"found", name:"Zero-Shot Prompting", tagline:"Just ask — no examples, clear instructions.",
+ what:"Zero-shot prompting asks the model to perform a task without giving it any examples. The model relies entirely on what it learned during pre-training plus the clarity of your instruction. It is the fastest, most common way to prompt and works well for familiar tasks such as summarizing, translating, classifying or rewriting. Its weakness is ambiguity: with no examples, the model has to guess your preferred format, tone and depth. So in zero-shot prompts, precise instructions, constraints and an explicit output format do all the heavy lifting.",
+ keys:[
+  ["Use a precise action verb","Summarize, classify, extract, rewrite, compare — not 'tell me about'."],
+  ["Name the audience & tone","'For a non-technical manager' changes depth and vocabulary dramatically."],
+  ["Specify the output format","Bullets, table, JSON, word count — never leave format to chance."],
+  ["Add constraints & exclusions","What to focus on, what to ignore, what to do if information is missing."],
+  ["Give context it can't infer","Domain, purpose, where the output will be used."],
+  ["Know when to upgrade","If outputs are inconsistent, move to few-shot."]
+ ],
+ ex:{
+  low:{t:"Simple translation",p:"Translate the following sentence into French:\n\"Where is the nearest train station?\"",w:"One clear, well-known task. Nothing to guess — zero-shot is perfect."},
+  med:{t:"Audience-aware summary",p:"Summarize the email below in exactly 3 bullet points for a busy manager.\nFocus only on decisions made and deadlines. Skip greetings and small talk.\n\nEmail:\n\"\"\"\n[paste email here]\n\"\"\"",w:"Adds audience, count, focus and exclusion. Delimiters (\"\"\") separate instructions from data."},
+  high:{t:"Classification with structured output",p:"Classify each customer review below as Positive, Negative, or Mixed.\n\nReturn a markdown table with columns:\n| # | Sentiment | Key reason (max 8 words) |\n\nRules:\n- \"Mixed\" only if the review has clear praise AND clear complaint.\n- If a review is sarcastic, classify by the real intent.\n\nReviews:\n1. \"Delivery was fast but the box was crushed.\"\n2. \"Oh great, another update that breaks my login. Fantastic.\"\n3. \"Exactly what I needed, works perfectly.\"",w:"Defines the labels, edge-case rules (sarcasm, mixed) and an exact table schema — no examples needed."},
+  expert:{t:"Focused code review",p:"You are a senior ServiceNow developer.\n\nReview the Business Rule below for PERFORMANCE issues only. Ignore naming and style.\n\nFor each issue return:\n1. Line reference\n2. Problem (one sentence)\n3. Why it matters at scale (e.g., 100k records)\n4. Corrected snippet\n\nIf there are no performance issues, reply exactly: \"No performance issues found.\"\n\n<script>\n[paste script]\n<\/script>",w:"Role + narrow scope + fixed output schema + explicit fallback. Tight boundaries make a zero-shot result reliable."},
+  complex:{t:"Constrained policy drafting",p:"Draft the \"Data Retention\" section of an internal policy for a mid-size SaaS company with customers in the EU and India.\n\nRequirements:\n- Align at a high level with GDPR and India's DPDP Act (do NOT cite article numbers you are unsure of).\n- Max 400 words, numbered clauses (1.1, 1.2 …).\n- Cover retention periods for: application logs, customer PII, backups, support tickets.\n- For each period, add a one-line justification.\n- Mark any clause needing legal sign-off with [LEGAL REVIEW].\n- End with a 3-row table: Data type | Retention | Deletion method.\n\nTone: formal, plain English, no marketing language.",w:"Many interacting constraints (legal scope, length, structure, honesty guard, table) in one instruction — the art of zero-shot at its limit."}
+ }
+},
+/* ---------------- 2. FEW-SHOT ---------------- */
+{
+ id:"few-shot", cat:"found", name:"Few-Shot Prompting", tagline:"Show, don't tell — teach by example.",
+ what:"Few-shot prompting includes a small number of input → output examples inside the prompt so the model can infer the pattern you want. Examples communicate format, tone, length and edge-case handling far better than descriptions can. The model then applies the same pattern to your new input. It is ideal for custom formats, labeling schemes, house writing styles and data transformations. Quality, consistency and diversity of the examples matter more than quantity — usually 2 to 5 is enough.",
+ keys:[
+  ["Use 2–5 consistent examples","Same structure, same labels, same delimiters every time."],
+  ["Cover the variety","Include different cases — and at least one edge case."],
+  ["Avoid accidental patterns","If all examples are positive or short, the model copies that bias."],
+  ["Put the real input last","In the identical format, with the output slot left open."],
+  ["Mind the order","The final example has the strongest influence; put the most typical one there."],
+  ["Combine with instructions","A one-line instruction + examples beats either alone."]
+ ],
+ ex:{
+  low:{t:"Pattern completion",p:"happy → sad\ntall → short\nfast → slow\nbright →",w:"Three examples make the antonym pattern unmistakable without any instruction."},
+  med:{t:"Brand tagline style",p:"Write a tagline in our brand style.\n\nProduct: Noise-cancelling headphones\nTagline: Silence, on demand.\n\nProduct: Insulated water bottle\nTagline: Cold stays cold. Period.\n\nProduct: Ergonomic office chair\nTagline: Sit less tired.\n\nProduct: Smart desk lamp\nTagline:",w:"Teaches a terse, punchy voice that would be hard to describe in words."},
+  high:{t:"Ticket triage to JSON",p:"Convert each support ticket into JSON.\n\nTicket: \"Can't log in since this morning, whole sales team blocked.\"\nOutput: {\"category\":\"Access\",\"priority\":\"P1\",\"users_affected\":\"team\"}\n\nTicket: \"Typo on the pricing page footer.\"\nOutput: {\"category\":\"Content\",\"priority\":\"P4\",\"users_affected\":\"none\"}\n\nTicket: \"Invoice PDF shows wrong tax for one customer.\"\nOutput: {\"category\":\"Billing\",\"priority\":\"P2\",\"users_affected\":\"single\"}\n\nTicket: \"Dashboard loads slowly for everyone after 5pm.\"\nOutput:",w:"Examples span different categories and priorities, implicitly teaching the severity scale."},
+  expert:{t:"Raw notes → refined test steps",p:"Rewrite raw tester notes into refined, numbered test steps with expected results.\n\n### Example 1\nRaw: open incident, set p1, save, check sla\nRefined:\n1. Navigate to Incident > Create New. — Expected: New Incident form opens.\n2. Set Impact = 1, Urgency = 1. — Expected: Priority auto-sets to 1 - Critical.\n3. Click Submit. — Expected: Record saves; number generated.\n4. Open the SLA related list. — Expected: P1 Resolution SLA attached and In Progress.\n\n### Example 2\nRaw: catalog item laptop, order, approve as mgr\nRefined:\n1. Open Service Catalog > Hardware > Laptop. — Expected: Item page loads with variables.\n2. Fill mandatory variables and click Order Now. — Expected: REQ and RITM created.\n3. Impersonate the requester's manager and open My Approvals. — Expected: Approval request visible.\n4. Click Approve. — Expected: RITM stage moves to Fulfilment.\n\n### Now you\nRaw: create change normal, submit for cab, reject\nRefined:",w:"Two rich examples fix the step/expected-result format and the level of detail."},
+  complex:{t:"Entity extraction with edge cases",p:"Extract meeting details. Use ISO dates (YYYY-MM-DD). If a field is missing write null. If a date is ambiguous, set \"needs_confirmation\": true.\n\nText: \"Let's sync Tuesday 14 Jan 2025 at 3pm with Priya about the budget.\"\nJSON: {\"date\":\"2025-01-14\",\"time\":\"15:00\",\"people\":[\"Priya\"],\"topic\":\"budget\",\"needs_confirmation\":false}\n\nText: \"Catch up next week sometime?\"\nJSON: {\"date\":null,\"time\":null,\"people\":[],\"topic\":null,\"needs_confirmation\":true}\n\nText: \"Review on 03/04 at 10 with Raj and Mei — roadmap Q3.\"\nJSON: {\"date\":null,\"time\":\"10:00\",\"people\":[\"Raj\",\"Mei\"],\"topic\":\"roadmap Q3\",\"needs_confirmation\":true}\n\nText: \"Board call Fri 7 Feb 2025, 9:30, CFO + CEO, topic: audit findings. Also maybe lunch after?\"\nJSON:",w:"Examples deliberately include missing data and ambiguous dates (03/04), so the model learns the fallback rules, not just the happy path."}
+ }
+},
+/* ---------------- 3. DIRECTIONAL STIMULUS ---------------- */
+{
+ id:"dsp", cat:"found", name:"Directional Stimulus Prompting", tagline:"Small hints that steer the output.",
+ what:"Directional Stimulus Prompting (DSP) adds short cues — keywords, hints, or a desired perspective — that steer the model toward a specific focus, tone or angle. Instead of rewriting the whole instruction, you plant a 'stimulus' that nudges what gets emphasised. It is especially useful in summarization, writing and analysis, where many valid outputs exist but you want a particular slant. In research setups a small model generates these hints automatically; in everyday use you write them yourself.",
+ keys:[
+  ["Add a labelled hint line","e.g. 'Hint / Keywords: …' kept separate from the main task."],
+  ["Keep stimuli short","A few keywords or one phrase — not a second instruction."],
+  ["Use it to set focus","Tell the model which facts or themes must appear."],
+  ["Use it to set perspective","'From a CFO's perspective' or 'through a security lens'."],
+  ["Don't contradict the source","Hints guide emphasis; they shouldn't force invented facts."],
+  ["Test with and without","Compare outputs to confirm the hint actually changes direction."]
+ ],
+ ex:{
+  low:{t:"Keyword-guided summary",p:"Summarize this article in 2 sentences.\nHint keywords: battery life, price drop.\n\n[article]",w:"The keywords decide which of many facts make the cut."},
+  med:{t:"Tone stimulus",p:"Write a 100-word product update announcing our new export feature.\nDirection: warm, slightly playful, celebrates the users who requested it.",w:"One line of direction changes the whole emotional colour of the text."},
+  high:{t:"Perspective steering",p:"Analyse the proposal below.\n\nStimulus: Evaluate strictly from the perspective of a CFO worried about cash flow in the next 2 quarters.\nMust mention: upfront cost, payback period, risk if adoption is slow.\n\nProposal:\n\"\"\"\n[proposal text]\n\"\"\"",w:"Perspective + must-mention hints convert a generic analysis into a targeted one."},
+  expert:{t:"Steered meeting minutes",p:"Turn this transcript into minutes.\n\nDirectional cues:\n- Emphasise: decisions, owners, blockers\n- De-emphasise: brainstorming tangents\n- Tone: neutral, factual, no blame language\n- Highlight any item touching \"go-live date\" with ⚠\n\nTranscript:\n<transcript>\n[paste]\n</transcript>",w:"Multiple cue types (emphasis, suppression, tone, flag) shape the same raw content precisely."},
+  complex:{t:"Multi-audience variants",p:"From the incident report below, produce three summaries (max 80 words each).\n\nVariant A — stimulus: \"customer reassurance; what we fixed; no jargon\"\nVariant B — stimulus: \"engineering root cause; timeline; contributing factors\"\nVariant C — stimulus: \"executive risk; revenue impact; prevention investment\"\n\nKeep every fact consistent across variants; only emphasis and vocabulary may change.\n\n<report>\n[incident report]\n</report>",w:"Uses stimuli as switches to produce controlled variants while a consistency rule protects accuracy."}
+ }
+},
+/* ---------------- 4. CHAIN OF THOUGHT ---------------- */
+{
+ id:"cot", cat:"reason", name:"Chain-of-Thought (CoT)", tagline:"Reason step by step before answering.",
+ what:"Chain-of-Thought prompting asks the model to break a problem into intermediate steps and reason through them before giving a final answer. Writing the steps out reduces jumps in logic and makes errors visible. It significantly improves accuracy on maths, logic, planning and multi-factor decisions. You can trigger it with a simple phrase like 'think step by step' (zero-shot CoT) or by showing worked examples (few-shot CoT). Always separate the reasoning from the final answer so you can check both.",
+ keys:[
+  ["Ask for reasoning first","Steps before the conclusion, never after."],
+  ["Structure the steps","Name the stages: identify knowns → compute → verify."],
+  ["Separate the final answer","e.g. end with 'Final answer: …' for easy parsing."],
+  ["Add worked examples for hard tasks","Few-shot CoT teaches the reasoning style."],
+  ["Ask it to verify","A sanity-check step catches arithmetic slips."],
+  ["Use for multi-step problems","Overkill for simple lookups."]
+ ],
+ ex:{
+  low:{t:"Discount maths",p:"A shirt costs ₹800. It has 25% off, then 5% GST is added on the discounted price.\nWhat is the final price? Think step by step, then give \"Final answer:\".",w:"Two dependent operations — writing steps prevents applying tax to the wrong base."},
+  med:{t:"Scheduling logic",p:"A train leaves at 9:40 and the journey takes 2 h 55 min. There is a 25-minute delay en route.\nI need 20 minutes from the station to my meeting. Will I make a 13:00 meeting?\n\nReason step by step:\n1. Arrival time without delay\n2. Arrival time with delay\n3. Time at the meeting\nThen answer Yes/No.",w:"Explicit numbered steps guide the reasoning path."},
+  high:{t:"Weighted decision",p:"Help me choose between two job offers.\n\nOffer A: ₹24 LPA, 1 h commute, strong mentor, stable company.\nOffer B: ₹30 LPA, remote, early-stage startup, unclear role.\n\nMy priorities (weights): learning 40%, money 30%, stability 20%, commute 10%.\n\nStep by step:\n1. Score each offer 1–10 per criterion with a one-line reason.\n2. Compute weighted totals (show the arithmetic).\n3. State which wins and how sensitive the result is to the weights.\nFinal answer on the last line.",w:"Forces transparent scoring and arithmetic, plus a sensitivity check."},
+  expert:{t:"Trace-based debugging",p:"The function below should return the second-largest unique number but fails for some inputs.\n\nfunction second(arr){\n  let a = -Infinity, b = -Infinity;\n  for (const x of arr){\n    if (x > a){ b = a; a = x; }\n    else if (x > b){ b = x; }\n  }\n  return b;\n}\n\nStep by step:\n1. Trace variables a and b for input [5, 5, 3].\n2. Compare with the expected result.\n3. Identify the faulty condition.\n4. Provide the fix and re-trace to prove it works.",w:"A manual variable trace is CoT applied to code — the bug (duplicate 5) surfaces naturally."},
+  complex:{t:"Capacity planning",p:"We run a support desk.\n- 1,200 tickets/week, 60% arrive Mon–Wed.\n- Avg handle time 18 min; agents are productive 6 h/day.\n- SLA: 90% of tickets answered within 4 business hours.\n- Planned 15% growth next quarter.\n\nThink step by step:\n1. Peak-day ticket volume.\n2. Agent-hours needed on the peak day.\n3. Agents needed today (round up) with a 15% buffer for absence.\n4. Agents needed next quarter.\n5. State every assumption you made.\n6. Sanity-check: does the result look realistic? Why?\n\nFinal answer: a 2-row table (Now / Next quarter → agents required).",w:"Multi-constraint problem; CoT plus explicit assumptions and a self-check make the result auditable."}
+ }
+},
+/* ---------------- 5. SELF-CONSISTENCY ---------------- */
+{
+ id:"self-consistency", cat:"reason", name:"Self-Consistency", tagline:"Many reasoning paths, one majority answer.",
+ what:"Self-consistency improves on chain-of-thought by generating several independent reasoning paths for the same question and then choosing the answer that appears most often or is best supported. A single chain can go wrong at one step; multiple diverse chains rarely all make the same mistake. It works best for problems with one correct answer — maths, logic, classification. You can run it via the API (several samples at higher temperature) or inside a single prompt by asking for multiple independent solutions.",
+ keys:[
+  ["Generate several independent paths","3–5 solutions, each reasoning from scratch."],
+  ["Force diversity","Ask for different methods, not the same steps reworded."],
+  ["Compare final answers","Majority vote, or a judged comparison."],
+  ["Investigate disagreements","When paths disagree, that's where the risk is."],
+  ["Use higher temperature via API","Diversity of samples is what makes voting useful."],
+  ["Best for single-answer tasks","Less useful for open creative writing."]
+ ],
+ ex:{
+  low:{t:"Three quick solves",p:"Solve 3 times independently, each time using a different method:\n\"If 4 pencils cost ₹36, how much do 7 cost?\"\nThen state the answer that appears most often.",w:"Unitary method, ratio, and algebra converge — confidence goes up."},
+  med:{t:"Classification vote",p:"Classify the sentiment of this review as Positive / Negative / Mixed.\nProduce 3 independent judgements, each with a one-line reason, then give the majority label.\n\nReview: \"Camera is stunning but the battery dies by lunch and support ignored me.\"",w:"Borderline inputs benefit from multiple judgements and a vote."},
+  high:{t:"Logic puzzle with vote",p:"Puzzle: Three boxes are labelled Apples, Oranges, Mixed — all labels are wrong. You may pick one fruit from one box. Which box do you pick from, and how do you relabel all boxes?\n\nGenerate 4 independent chains of reasoning (Path 1–4). Do not reference earlier paths.\nThen:\n- List each path's final answer\n- Select the majority answer\n- Explain why any outlier path failed",w:"Asks for outlier analysis — turning disagreement into learning."},
+  expert:{t:"Estimation with confidence",p:"Estimate the number of petrol pumps in Pune.\n\nProduce 3 independent Fermi estimates using different anchors:\nA) population & vehicles per pump\nB) area & pump density\nC) fuel demand & pump throughput\n\nShow each calculation. Then report: median estimate, range, and a confidence level (low/med/high) based on how close the three are.",w:"Different anchors give genuine independence; spread becomes a confidence signal."},
+  complex:{t:"Root-cause consensus",p:"Production symptom: API latency jumped from 120 ms to 900 ms after Tuesday's deploy. CPU normal, DB connections maxed out, error rate unchanged.\n\nAct as 3 independent SREs (no shared notes):\n- SRE-1 starts from the database\n- SRE-2 starts from the deploy diff\n- SRE-3 starts from traffic patterns\n\nEach gives: hypothesis, evidence for/against, next diagnostic step.\n\nThen as the incident lead:\n1. Identify the hypothesis most consistent across all three\n2. Rank remaining hypotheses\n3. Propose the single fastest test to confirm",w:"Self-consistency applied to diagnosis: independent investigators, then consensus."}
+ }
+},
+/* ---------------- 6. GENERATE KNOWLEDGE ---------------- */
+{
+ id:"gen-knowledge", cat:"reason", name:"Generated Knowledge Prompting", tagline:"First recall the facts, then answer.",
+ what:"Generated knowledge prompting is a two-stage approach: first the model writes out the background facts, principles or definitions relevant to the question; then it answers using that generated knowledge. Surfacing the knowledge explicitly helps the model avoid shallow or common-sense errors and gives you a chance to inspect the facts it is relying on. It is effective for domain questions, comparisons and explanations. Because the facts come from the model itself, you should still verify anything high-stakes.",
+ keys:[
+  ["Split into two steps","Step 1: list knowledge. Step 2: answer using it."],
+  ["Ask for relevant facts only","Scope the knowledge to what the question needs."],
+  ["Make the answer cite the facts","'Use only the facts listed above.'"],
+  ["Inspect before trusting","You can catch a wrong fact before it becomes a wrong conclusion."],
+  ["Mark uncertainty","Ask it to flag facts it's unsure about."],
+  ["Pair with RAG for critical topics","Generated facts can be outdated or wrong."]
+ ],
+ ex:{
+  low:{t:"Common sense check",p:"First, list 3 facts about how golf is scored.\nThen answer: \"Is the goal of golf to get a higher score than other players?\"",w:"Recalling the scoring rule first prevents the intuitive-but-wrong answer."},
+  med:{t:"Explain with grounding",p:"Step 1 — List 5 key facts about how compound interest works.\nStep 2 — Using only those facts, explain to a 15-year-old why starting to save at 22 beats starting at 32. Include one numeric illustration.",w:"The facts become the scaffold for a simpler explanation."},
+  high:{t:"Technology comparison",p:"Question: Should a 4-person team building a CRUD internal app pick PostgreSQL or MongoDB?\n\nStep 1 — Generate knowledge: list key facts about each (data model, transactions, schema flexibility, tooling, typical use cases). Mark any fact you are uncertain about with (?).\nStep 2 — List the requirements implied by the scenario.\nStep 3 — Answer by mapping facts to requirements. Reference facts by number.",w:"Knowledge → requirements → mapping creates a traceable recommendation."},
+  expert:{t:"Platform-specific design",p:"Task: Recommend whether to use a Business Rule, Flow Designer flow, or Script Include for auto-assigning incidents by location in ServiceNow.\n\nPart A — Knowledge: for each option, list execution context, when it runs, maintainability, performance considerations, and upgrade safety.\nPart B — Constraints: 50k incidents/month, admins are low-code, assignment logic changes quarterly.\nPart C — Recommendation using Part A facts, with one risk and mitigation.",w:"Forces the platform knowledge out first so the recommendation is grounded rather than habitual."},
+  complex:{t:"Policy impact analysis",p:"We're considering a 4-day work week for our 120-person IT services company in India.\n\nPhase 1 — Generate knowledge in 4 groups:\n a) Known outcomes from published 4-day-week trials (summarise generally; do not invent study names)\n b) Labour-law considerations to check (as questions, not legal advice)\n c) Client-SLA implications for service businesses\n d) Common implementation models (compressed hours, staggered teams, etc.)\n\nPhase 2 — Critique the knowledge: which items are uncertain or context-dependent?\n\nPhase 3 — Using Phases 1–2, propose a 3-month pilot design with success metrics and a go/no-go rule.",w:"Adds a critique phase between generation and use, filtering weak knowledge before it drives a plan."}
+ }
+},
+/* ---------------- 7. TREE OF THOUGHTS ---------------- */
+{
+ id:"tot", cat:"reason", name:"Tree of Thoughts (ToT)", tagline:"Branch, evaluate, prune, expand.",
+ what:"Tree of Thoughts extends chain-of-thought by exploring several reasoning branches at each step instead of one straight line. The model proposes multiple candidate ideas, evaluates how promising each is, expands the best ones and abandons dead ends — similar to how a person brainstorms and then narrows down. It shines on planning, strategy, puzzles and design problems where the first idea is often not the best. You can simulate it inside one prompt or orchestrate it across several calls.",
+ keys:[
+  ["Generate multiple candidates","3+ distinct options at each decision point."],
+  ["Evaluate with explicit criteria","Score or label each branch: sure / maybe / dead end."],
+  ["Prune and expand","Only develop the most promising branches further."],
+  ["Allow backtracking","If a branch fails, return to the next-best one."],
+  ["Show the tree","Ask for the structure so you can audit the path."],
+  ["Use for open-ended problems","Too heavy for simple, single-path tasks."]
+ ],
+ ex:{
+  low:{t:"Three ideas, pick one",p:"Give 3 different ideas for a team-building activity for 10 remote people.\nRate each 1–5 on cost, fun and inclusiveness. Pick the best and explain why.",w:"The simplest tree: one level of branches plus evaluation."},
+  med:{t:"Two-level exploration",p:"Goal: increase newsletter sign-ups on our blog.\n\nLevel 1: propose 3 distinct strategies.\nEvaluate each (impact, effort) and keep the top 2.\nLevel 2: for each kept strategy, propose 2 concrete tactics.\nFinally choose the single best tactic to try first.",w:"Branches at two levels with pruning in between."},
+  high:{t:"Puzzle with backtracking",p:"Use the numbers 4, 7, 8, 8 exactly once each with + − × ÷ and brackets to make 24.\n\nWork as a tree:\n- Propose 3 possible first operations.\n- For each, mark it \"promising\" or \"dead end\" with a reason.\n- Expand promising branches; backtrack if stuck.\n- Show the successful path and verify the arithmetic.",w:"Classic ToT task — systematic search beats a single guess."},
+  expert:{t:"Architecture decision",p:"We need real-time notifications for a web app (≈50k concurrent users).\n\nTree of Thoughts:\n1. Branch: propose 3 architectures (e.g., WebSockets service, managed pub/sub, SSE + queue).\n2. For each, think 2 steps ahead: scaling bottleneck, failure mode.\n3. Evaluate each branch on cost, complexity, reliability (1–5) with justification.\n4. Prune the weakest. Expand the remaining two with a deployment sketch.\n5. Choose one and state the conditions under which the runner-up would be better.",w:"Lookahead per branch plus 'when would the alternative win' captures real architectural thinking."},
+  complex:{t:"Multi-expert tree",p:"Imagine three experts solving this together. Each writes ONE step of their thinking, shares it, then all move to the next step. Any expert who realises their line is wrong leaves.\n\nProblem: Plan a 6-month roadmap to migrate 40 legacy reports from an on-prem SQL Server to a cloud BI tool with no downtime for the finance team at quarter-end.\n\nRules:\n- Show each round as: Round N → Expert A / B / C\n- After each round, list surviving lines of reasoning\n- Conclude with the consensus roadmap (month by month) and the top 3 risks",w:"The well-known 'three experts' ToT prompt — branching, peer evaluation and elimination in one go."}
+ }
+},
+/* ---------------- 8. MULTIMODAL COT ---------------- */
+{
+ id:"mm-cot", cat:"struct", name:"Multimodal Chain-of-Thought", tagline:"Step-by-step reasoning across images, text & more.",
+ what:"Multimodal chain-of-thought extends step-by-step reasoning to inputs beyond text — images, charts, screenshots, diagrams or audio transcripts. The model is asked to first describe what it observes in each modality, then reason step by step by linking those observations together and to the question. Separating 'what I see' from 'what it means' reduces hallucinated details and makes the reasoning auditable. It is valuable for chart analysis, UI reviews, document understanding and troubleshooting from screenshots.",
+ keys:[
+  ["Observe before reasoning","First list what is literally in the image/audio."],
+  ["Reference specific regions","'Top-left legend', 'row 3', 'the red error banner'."],
+  ["Link modalities explicitly","Connect visual evidence with text context."],
+  ["Reason step by step","Then derive the conclusion from the observations."],
+  ["Flag unreadable parts","Ask the model to say when something is unclear rather than guess."],
+  ["Verify against the source","Ask for a final consistency check against the image."]
+ ],
+ ex:{
+  low:{t:"Describe then answer",p:"[image: photo of a fridge interior]\n\nFirst list every item you can see. Then suggest one dinner I can make using only those items.",w:"Observation step prevents suggesting ingredients that aren't there."},
+  med:{t:"Chart reading",p:"[image: line chart of monthly sales]\n\nStep 1: State the axes, units and time range.\nStep 2: Describe the overall trend and any spikes or dips (with months).\nStep 3: Give 2 possible explanations for the biggest change.\nIf any label is unreadable, say so.",w:"Axes-first reading avoids misinterpreting scale or units."},
+  high:{t:"Screenshot troubleshooting",p:"[image: screenshot of an error dialog]\n[text: \"This happens when I click Save on the expense form.\"]\n\n1. Transcribe the exact error text visible in the screenshot.\n2. Note any other visible clues (URL, field highlights, user, timestamp).\n3. Combine these with my description to list likely causes, most likely first.\n4. Give the next 3 diagnostic steps.",w:"Exact transcription plus contextual clues gives the reasoning solid ground."},
+  expert:{t:"UI accessibility review",p:"[image: mobile app checkout screen]\n\nPerform a step-by-step accessibility review.\nA) Inventory: list every UI element with its approximate position.\nB) For each element, observe: colour contrast (estimate), touch-target size, label clarity.\nC) Reason: map each observation to an accessibility concern (WCAG principle in plain words).\nD) Output a prioritised table: Element | Issue | Severity | Fix.\nOnly report issues you can see evidence for.",w:"Inventory → observation → reasoning → table makes a visual audit systematic and evidence-based."},
+  complex:{t:"Cross-document verification",p:"Inputs:\n[image 1: scanned invoice]\n[image 2: photo of delivery note]\n[text: purchase order PO-4471 details pasted below]\n\nTask: Three-way match.\n1. Extract from each source: vendor, item lines (desc, qty, unit price), totals, dates.\n2. Present a side-by-side comparison table.\n3. Reason step by step about each mismatch: is it rounding, partial delivery, or a real discrepancy?\n4. Decision: Approve / Hold / Reject, with justification.\n5. List any field you could not read confidently.\n\nPO text:\n\"\"\"\n[PO details]\n\"\"\"",w:"Combines two images and text, with extraction, alignment and reasoning stages — real-world multimodal CoT."}
+ }
+},
+/* ---------------- 9. GRAPH PROMPTING ---------------- */
+{
+ id:"graph", cat:"struct", name:"Graph Prompting", tagline:"Reason over nodes and relationships.",
+ what:"Graph prompting represents information as a graph — entities as nodes and relationships as edges — and asks the model to reason over that structure. Making relationships explicit helps with questions about dependencies, paths, influence, hierarchy and impact that are hard to follow in prose. You can give the model a graph (as triples, adjacency lists or Mermaid) or ask it to build one from text first. It is useful for system dependencies, org structures, knowledge graphs and project planning.",
+ keys:[
+  ["Use a consistent notation","Triples (A —relation→ B), adjacency lists, or Mermaid."],
+  ["Name relationship types","'depends_on', 'reports_to', 'causes' — not just lines."],
+  ["Ask path & impact questions","What breaks if X fails? What's the shortest path?"],
+  ["Let the model build the graph","Extract nodes/edges from text as a first step."],
+  ["Check for cycles & orphans","Ask it to validate the structure."],
+  ["Visualise the result","Request Mermaid output you can render."]
+ ],
+ ex:{
+  low:{t:"Simple relationship question",p:"Relationships:\nAsha —parent_of→ Ravi\nRavi —parent_of→ Meera\nAsha —sibling_of→ Kiran\n\nWhat is Kiran's relationship to Meera? Show the path.",w:"Explicit edges make multi-hop family logic easy to follow."},
+  med:{t:"Build a graph from text",p:"Read the paragraph below and extract a graph.\nOutput as triples: (Entity) —relation→ (Entity)\nThen draw it as a Mermaid flowchart.\n\n\"\"\"\nThe payment service calls the fraud API before charging cards. The fraud API reads from the risk database. Orders depend on the payment service and the inventory service.\n\"\"\"",w:"Converting prose to a graph exposes structure for later questions."},
+  high:{t:"Dependency impact",p:"Service graph (depends_on):\nWeb → API\nAPI → Auth, Orders\nOrders → Inventory, Payments\nPayments → FraudAPI\nReports → Orders\n\nQuestions:\n1. If Inventory goes down, which services are impacted (directly and indirectly)?\n2. What is the deploy order from leaves to root?\n3. Is there any single point of failure? Explain using the graph.",w:"Impact analysis and topological ordering are natural graph operations."},
+  expert:{t:"Story dependency planning",p:"Stories and dependencies:\nS1 Data model — none\nS2 REST API — S1\nS3 UI form — S2\nS4 Notifications — S2\nS5 Reporting — S1, S4\nS6 SSO — none\nS7 Admin console — S3, S6\nEstimates (days): S1 3, S2 5, S3 4, S4 2, S5 3, S6 4, S7 3\n\nTreat this as a directed graph.\n1. Validate: any cycles?\n2. Compute the critical path and total duration.\n3. With 2 developers, propose a day-by-day parallel schedule.\n4. Output a Mermaid gantt chart.",w:"Graph reasoning for critical-path scheduling — beyond what a flat list can show."},
+  complex:{t:"Knowledge graph Q&A",p:"Step 1 — From the three documents below, build a knowledge graph of people, teams, systems and decisions. Use relation types: owns, member_of, decided, impacts, depends_on.\nStep 2 — List contradictions where two documents assert conflicting edges.\nStep 3 — Answer using the graph only, citing edges:\n  a) Who ultimately approved the move to the new billing system?\n  b) Which teams are affected if the billing migration slips 1 month?\n  c) Which decision has no clear owner?\nStep 4 — Output the graph as Mermaid.\n\n<doc1>[…]</doc1>\n<doc2>[…]</doc2>\n<doc3>[…]</doc3>",w:"Builds, validates and queries a multi-source graph — graph prompting as a reasoning engine."}
+ }
+},
+/* ---------------- 10. META PROMPTING ---------------- */
+{
+ id:"meta", cat:"iter", name:"Meta Prompting", tagline:"Let the model write the prompt.",
+ what:"Meta prompting asks the model to create, structure or improve a prompt before (or instead of) doing the task itself. The model focuses on the shape of a good prompt — role, context, steps, format, constraints — and you then run that prompt. It is a fast way to turn a vague goal into a strong, reusable instruction or template. It also helps when building system prompts, agents or prompt libraries, because the model can expose missing information and assumptions you didn't think of.",
+ keys:[
+  ["Describe the goal, not the steps","Purpose, audience, constraints, success criteria."],
+  ["Ask for the prompt only","Explicitly say: 'Don't do the task — write the prompt.'"],
+  ["Request placeholders","Templates with {variables} become reusable."],
+  ["Ask for missing info","Have it list questions or assumptions first."],
+  ["Critique and iterate","Ask it to score and improve its own prompt."],
+  ["Then test it","Run the generated prompt on real inputs."]
+ ],
+ ex:{
+  low:{t:"Improve a vague prompt",p:"Rewrite this prompt so it produces a more useful answer. Return only the improved prompt.\n\nOriginal: \"tell me about dogs\"",w:"The model adds scope, audience and format you didn't specify."},
+  med:{t:"Prompt for a blog post",p:"I want to write a blog post about remote-work productivity for team leads.\nDon't write the blog. Instead write a detailed prompt I can give to an AI to produce it. Include role, audience, structure, tone, length and things to avoid.",w:"Separates prompt design from content generation."},
+  high:{t:"Reusable template",p:"Create a reusable prompt template for summarising client meeting transcripts.\n\nRequirements:\n- Use {placeholders} for: client_name, meeting_date, transcript, audience\n- Output sections: Summary, Decisions, Action items (owner, due), Risks\n- Include rules for missing info and for sensitive data\n- Wrap inputs in XML tags\n\nReturn: the template, then a 3-line usage guide.",w:"Produces a parameterised asset you can reuse forever."},
+  expert:{t:"System prompt for an agent",p:"Act as a prompt engineer. Design a system prompt for an AI assistant that reviews ServiceNow scripts.\n\nBefore writing, list up to 5 clarifying questions you would ask me, then state the assumptions you'll use instead.\n\nThe system prompt must include:\n- Role and scope (what it does / refuses)\n- Review dimensions with severity levels\n- Exact output format (tables)\n- Behaviour when code is incomplete\n- 1 short example of input → output\n\nFinally score your prompt 1–10 on clarity, completeness and robustness and suggest one improvement.",w:"Questions → assumptions → prompt → self-score gives a production-grade agent prompt."},
+  complex:{t:"Prompt suite for a pipeline",p:"I'm building a 3-stage AI pipeline: (1) extract requirements from raw user stories, (2) generate test cases, (3) review test cases for gaps.\n\nDesign the full prompt suite:\n- One prompt per stage\n- A shared JSON schema passed between stages (define it)\n- Validation rules each stage applies to its input\n- Failure handling: what each stage outputs if the input is invalid\n- A 'conductor' prompt that decides whether to rerun a stage\n\nPresent as: Schema → Stage 1 → Stage 2 → Stage 3 → Conductor. Keep each prompt under 250 words.",w:"Meta prompting at system scale — the model designs the prompts and contracts of an entire workflow."}
+ }
+},
+/* ---------------- 11. PROMPT CHAINING ---------------- */
+{
+ id:"chaining", cat:"iter", name:"Prompt Chaining", tagline:"Output of one prompt feeds the next.",
+ what:"Prompt chaining breaks a large task into a sequence of smaller prompts, where each prompt's output becomes the next prompt's input. Each link has one clear job, so it is easier to write, test and debug than one giant prompt. You can inspect and correct intermediate results before they flow downstream. Chaining is the backbone of most real-world AI workflows: research → outline → draft → edit, or extract → transform → validate → report.",
+ keys:[
+  ["One job per prompt","Extract, then analyse, then write — never all at once."],
+  ["Use structured handoffs","JSON or XML tags make outputs easy to pass on."],
+  ["Validate between steps","Check intermediate output before the next call."],
+  ["Keep context lean","Pass only what the next step needs."],
+  ["Design for retries","A failed step can be rerun without redoing everything."],
+  ["Branch or loop when needed","Chains can include review-and-redo loops."]
+ ],
+ ex:{
+  low:{t:"Two-step: outline → write",p:"PROMPT 1:\n\"Create a 5-point outline for a short article on 'Why sleep matters for students'.\"\n\nPROMPT 2 (paste outline from step 1):\n\"Using this outline, write a 300-word article in a friendly tone:\n<outline>\n[output of prompt 1]\n</outline>\"",w:"Separating structure from writing gives you a checkpoint to adjust the outline."},
+  med:{t:"Feedback analysis chain",p:"PROMPT 1 — Extract:\n\"From the survey comments below, extract every distinct complaint as a JSON list of objects with keys quote and theme.\"\n\nPROMPT 2 — Aggregate:\n\"Given this JSON, count complaints per theme and rank them.\"\n\nPROMPT 3 — Recommend:\n\"For the top 3 themes, propose one fix each with expected impact.\"",w:"Extract → aggregate → recommend; each step is verifiable."},
+  high:{t:"Document → email chain",p:"Step 1: \"Extract all quotes and figures relevant to Q3 revenue from <doc>. Output inside <quotes></quotes>. If none, write NONE.\"\n\nStep 2: \"Using only the <quotes> provided, write 3 key insights for the leadership team.\"\n\nStep 3: \"Turn these insights into a concise email to the CEO (max 150 words), subject line included.\"\n\nStep 4: \"Review the email against the <quotes>. List any claim not supported by a quote.\"",w:"Includes a final grounding-check step, catching unsupported claims before sending."},
+  expert:{t:"Story documentation chain",p:"Chain for documenting a delivered user story:\n\n1. PARSE — \"From the story text and acceptance criteria, output JSON: {story_id, goal, criteria[], components[]}.\"\n2. CODE REVIEW — \"Given components[] and the script below, review each against best practices. Output a table.\"\n3. TESTS — \"Given criteria[], generate test steps with expected results, one block per criterion.\"\n4. TECH DOC — \"Using outputs 1–3, write a technical summary: design, configuration, risks.\"\n5. ASSEMBLE — \"Combine 1–4 into one client-ready Markdown document with a table of contents.\"\n\nRule: if any step's JSON is invalid, stop and report which field failed.",w:"A realistic multi-artefact pipeline with a schema and a stop rule."},
+  complex:{t:"Branching chain with a loop",p:"Pipeline: customer email → routed response\n\n1. CLASSIFY → {intent: billing | technical | cancellation | other, urgency: 1-3, language}\n2. BRANCH on intent:\n   • billing → prompt B: fetch account summary (tool) → draft reply\n   • technical → prompt T: extract error details → search KB → draft reply\n   • cancellation → prompt C: draft retention offer within policy limits\n   • other → route to human, stop\n3. QA PROMPT → score draft 1–5 for accuracy, tone, policy compliance\n4. LOOP: if any score < 4, send QA feedback back to the branch prompt (max 2 loops)\n5. FINALISE → translate to the customer's language if not English\n\nWrite all prompts (1, B, T, C, QA, 5) with their input/output formats.",w:"Conditional branching plus a quality loop — chaining as a full workflow engine."}
+ }
+},
+/* ---------------- 12. APE ---------------- */
+{
+ id:"ape", cat:"iter", name:"Automatic Prompt Engineer (APE)", tagline:"AI generates and selects the best prompt.",
+ what:"Automatic Prompt Engineer uses the model itself to generate many candidate instructions for a task, then evaluates them and keeps the best performer. You supply examples of inputs with their desired outputs; the model infers what instruction would produce those outputs, proposes variants, and each variant is scored against test cases. It treats prompt writing as an optimisation search instead of guesswork. It is most valuable when you'll run a prompt thousands of times and small quality gains matter.",
+ keys:[
+  ["Start from input/output pairs","Show what 'good' looks like — the model infers the instruction."],
+  ["Generate many candidates","5–10 differently-worded instructions."],
+  ["Hold out test cases","Score candidates on examples not used to create them."],
+  ["Define a scoring metric","Exact match, rubric score, or format validity."],
+  ["Iterate on the winners","Ask for variations of the top performers."],
+  ["Keep a human in the loop","Review the winner for unintended shortcuts."]
+ ],
+ ex:{
+  low:{t:"Infer the instruction",p:"Here are input → output pairs:\n\"cat\" → \"tac\"\n\"house\" → \"esuoh\"\n\"prompt\" → \"tpmorp\"\n\nWhat instruction would produce these outputs? Give 3 candidate instructions.",w:"Core APE move: reverse-engineer the instruction from examples."},
+  med:{t:"Candidates + choose",p:"Task: turn product specs into a one-line benefit statement.\nExamples:\n- \"5000 mAh battery\" → \"Lasts all day, and then some.\"\n- \"IP68 rating\" → \"Rain, splashes, dunks — no problem.\"\n\n1. Write 5 different instructions that could produce outputs like these.\n2. Apply each to: \"120 Hz display\".\n3. Pick the instruction whose output best matches the example style and say why.",w:"Generate → apply → select, all in one prompt."},
+  high:{t:"Scored on held-out tests",p:"I'll give you 6 labelled examples of support tickets with the correct department. Use examples 1–3 to propose 6 candidate classification instructions. Then evaluate each instruction on examples 4–6 (simulate applying it), report accuracy per instruction, and return the best instruction verbatim.\n\n<train>\n1..3 [ticket → department]\n</train>\n<test>\n4..6 [ticket → department]\n</test>",w:"Train/test split prevents overfitting the prompt to the examples."},
+  expert:{t:"Rubric-driven optimisation",p:"Goal: a prompt that writes release notes from Jira ticket titles.\n\nRubric (score each 1–5): user-facing language, groups by feature/fix, no internal jargon, under 120 words.\n\nRound 1: generate 5 candidate prompts.\nFor each, generate release notes for the ticket list below, then score against the rubric (table).\nRound 2: take the top 2, create 3 mutations of each (change wording, add a constraint, add an example).\nScore again and return the winning prompt + its scores.\n\nTickets:\n[ticket list]",w:"An evolutionary loop — generate, score, mutate, re-score — mirrors how APE works."},
+  complex:{t:"Robustness-tested prompt search",p:"Find the best prompt for extracting invoice fields (vendor, invoice_no, date, total, currency) as JSON.\n\n1. Infer an initial instruction from the 3 gold examples.\n2. Generate 8 candidate prompts covering different styles (terse, step-by-step, schema-first, example-first).\n3. Build a stress-test set of 5 invoices including: missing currency, two dates, handwritten total, non-English labels, total in words.\n4. Simulate each candidate on the stress set. Score: field accuracy (0–5) + valid JSON (0/1).\n5. Report a leaderboard table.\n6. Combine the strengths of the top 2 into a final prompt and explain which failure modes it fixes.\n\n<gold>[3 examples]</gold>",w:"Adds adversarial test design and prompt fusion — APE for production robustness."}
+ }
+},
+/* ---------------- 13. ACTIVE-PROMPT ---------------- */
+{
+ id:"active", cat:"iter", name:"Active-Prompt", tagline:"Find where the model is unsure — teach it there.",
+ what:"Active-prompt refines a prompt over successive rounds based on the model's intermediate outputs. Instead of choosing examples at random, you run the prompt on many inputs, measure where the model is most uncertain or inconsistent, and add carefully annotated (often chain-of-thought) examples precisely for those hard cases. The prompt therefore improves where it is weakest. It is a disciplined, data-driven way to build few-shot prompts for classification, reasoning and extraction tasks.",
+ keys:[
+  ["Run on a batch first","Collect outputs across many sample inputs."],
+  ["Measure uncertainty","Disagreement across repeated runs = uncertainty."],
+  ["Pick the hardest cases","Annotate the inputs the model struggles with most."],
+  ["Write high-quality rationales","Annotated examples should show the reasoning."],
+  ["Add, re-run, compare","Each round should measurably reduce errors."],
+  ["Stop at diminishing returns","When new examples no longer improve results."]
+ ],
+ ex:{
+  low:{t:"Spot the uncertain item",p:"Classify each word as Fruit or Vegetable. For each, also give your confidence (high/med/low).\ntomato, apple, carrot, cucumber, banana, pumpkin\n\nThen list the low-confidence items — I'll give you rules for those.",w:"The model reveals its weak spots so you know where to add guidance."},
+  med:{t:"Round 2 refinement",p:"Earlier you were unsure about tomato, cucumber and pumpkin.\nRule with example: \"Botanically, a fruit develops from the flower and contains seeds. Tomato → has seeds from the flower → Fruit.\"\n\nUsing this rule, re-classify: tomato, cucumber, pumpkin, pepper, potato. Explain each in one line.",w:"Adds an annotated example targeting exactly the uncertain cases."},
+  high:{t:"Uncertainty by disagreement",p:"For each of the 10 tickets below, classify the priority (P1–P4) 3 separate times, reasoning independently each time.\nThen produce a table: Ticket | Answers | Agreement (3/3, 2/3, 1/3).\nList the tickets with agreement below 3/3 — these are the candidates for annotated examples.\n\n<tickets>\n[10 tickets]\n</tickets>",w:"Uses disagreement across runs as the uncertainty metric — the heart of Active-prompt."},
+  expert:{t:"Building the annotated set",p:"These 3 tickets had the lowest agreement last round. I've annotated them:\n\nTicket: \"Payroll page slow but works\" → P3. Rationale: degraded, workaround exists, no deadline at risk.\nTicket: \"One VP can't access board deck before meeting in 1 hr\" → P2. Rationale: single user, but high business impact and a hard time limit.\nTicket: \"Typo in legal disclaimer on checkout\" → P2. Rationale: low technical impact but compliance risk.\n\nAdd these as examples to your instructions. Now re-run the full 10-ticket batch 3 times and report the new agreement table and how it compares with the previous round.",w:"Round-based improvement with measurable before/after comparison."},
+  complex:{t:"Full active-prompting loop",p:"Run an Active-prompt cycle for classifying contract clauses (Indemnity, Liability Cap, Termination, Confidentiality, Other).\n\nRound 0: Classify all 20 clauses below 3× each with CoT. Compute agreement per clause.\nSelect: the 4 clauses with the lowest agreement.\nAnnotate: for each, write the ideal step-by-step rationale and label (I'll correct you if wrong — mark these DRAFT).\nRound 1: Add the 4 annotated examples to the prompt. Re-run 3× on the remaining 16.\nReport: agreement before vs after, remaining uncertain clauses, and whether another round is worthwhile.\n\n<clauses>\n[20 clauses]\n</clauses>",w:"The complete loop — measure, select, annotate, re-run, decide — inside one structured prompt."}
+ }
+},
+/* ---------------- 14. REFLEXION ---------------- */
+{
+ id:"reflexion", cat:"iter", name:"Reflexion", tagline:"Draft, self-critique, revise.",
+ what:"Reflexion has the model evaluate its own previous output, write a reflection on what was wrong or weak, and then produce an improved version using that feedback. The reflection acts as a short-term memory of lessons learned that guides the next attempt. It noticeably improves code, writing and reasoning tasks where quality can be checked against criteria or tests. The key is giving specific evaluation criteria — vague 'make it better' requests produce vague improvements.",
+ keys:[
+  ["Generate a first draft","Get something concrete to critique."],
+  ["Critique against explicit criteria","Correctness, completeness, clarity, constraints."],
+  ["Write the reflection down","List concrete problems and lessons."],
+  ["Revise using the reflection","Each change should trace to a critique point."],
+  ["Use external signals if possible","Test results or errors make reflection sharper."],
+  ["Cap the loops","2–3 rounds usually captures most of the gain."]
+ ],
+ ex:{
+  low:{t:"Check and fix",p:"Write a 4-line poem about the monsoon where every line ends with a rhyme.\nThen check: does every line rhyme? If not, fix it and show the final version.",w:"A simple, checkable criterion makes self-correction reliable."},
+  med:{t:"Critique a summary",p:"1. Summarise the article below in 80 words.\n2. Critique your summary: Did it miss a key point? Any claim not in the article? Over 80 words?\n3. Rewrite the summary fixing every issue found.\n\n<article>\n[article]\n</article>",w:"Three concrete checks: coverage, faithfulness, length."},
+  high:{t:"Code with test-driven reflection",p:"Write a JavaScript function isValidPAN(s) that validates an Indian PAN format (5 letters, 4 digits, 1 letter, uppercase).\n\nThen:\n1. Mentally run these tests and show pass/fail: \"ABCDE1234F\", \"abcde1234f\", \"ABCD1234F\", \"ABCDE12345\", \" ABCDE1234F\".\n2. Reflection: explain the cause of any failure.\n3. Write the corrected function and re-run the tests.",w:"Tests give the reflection a hard signal instead of opinion."},
+  expert:{t:"Rubric-based reflection",p:"Draft a cover email to a client explaining a 2-week delay in UAT.\n\nThen reflect using this rubric (score 1–5 each):\n- Accountability without over-apologising\n- Clear new dates and reasons\n- Confidence-building next steps\n- Under 180 words\n\nWrite a \"Lessons\" list (what to change).\nProduce version 2. Score it again. Stop when all scores ≥ 4 (max 3 versions).",w:"Quantified rubric + stopping condition makes the loop controlled."},
+  complex:{t:"Multi-perspective reflexion",p:"Task: write a design doc section proposing caching for our product catalogue API.\n\nAttempt 1: write the section (max 350 words).\n\nReflection — review as three critics:\n- Security reviewer: data leakage, cache poisoning\n- SRE: invalidation, stampede, observability\n- Product owner: user-visible staleness, business rules\nEach lists max 3 concrete issues.\n\nMemory: consolidate into a numbered \"Lessons\" list.\n\nAttempt 2: rewrite addressing every lesson; tag each fix with [L#].\n\nFinal check: list any lesson NOT addressed and why.",w:"Diverse critics produce richer reflections; [L#] tags prove each lesson was applied."}
+ }
+},
+/* ---------------- 15. RAG ---------------- */
+{
+ id:"rag", cat:"tools", name:"Retrieval-Augmented Generation (RAG)", tagline:"Ground answers in retrieved documents.",
+ what:"Retrieval-Augmented Generation combines a search step with generation: relevant documents are retrieved from a knowledge source and inserted into the prompt, and the model answers using that context. This grounds answers in current, private or domain-specific data the model was never trained on, and greatly reduces hallucinations. At the prompt level, the craft is in how you present the retrieved context and instruct the model to use only it, cite it, and admit when the answer isn't there.",
+ keys:[
+  ["Retrieve first, generate second","Relevant chunks go into the prompt as context."],
+  ["Delimit the context clearly","Tag each document with an ID: <doc id=\"3\">…</doc>."],
+  ["Restrict to the context","'Answer only from the documents provided.'"],
+  ["Require citations","Each claim references a document ID."],
+  ["Define the 'not found' behaviour","'If the answer isn't in the documents, say so.'"],
+  ["Retrieval quality is everything","Bad chunks in = bad answer out."]
+ ],
+ ex:{
+  low:{t:"Answer from one document",p:"Answer the question using only the text below. If the answer is not there, say \"Not in the document.\"\n\n<doc>\nOur office is open Monday–Friday, 9:00–18:00. Closed on public holidays.\n</doc>\n\nQuestion: Is the office open on Saturday?",w:"Basic grounding with an explicit fallback."},
+  med:{t:"Multi-doc with citations",p:"Use the documents to answer. Cite the doc ID in square brackets after each fact, e.g. [2].\n\n<doc id=\"1\">Leave policy: 18 annual leave days per year…</doc>\n<doc id=\"2\">Carry-forward: max 6 days to next year…</doc>\n<doc id=\"3\">Encashment allowed only on exit…</doc>\n\nQuestion: I have 10 unused days in December. What happens to them?",w:"Citations let the reader verify every statement."},
+  high:{t:"Quote-first grounding",p:"<documents>\n<doc id=\"A\" source=\"SLA_v3.pdf\">…</doc>\n<doc id=\"B\" source=\"Contract_2024.pdf\">…</doc>\n</documents>\n\nTask: What penalty applies if P1 incidents breach resolution time 3 times in a month?\n\n1. First, extract the exact relevant quotes inside <quotes> with doc IDs.\n2. Then answer using only those quotes.\n3. If the documents conflict, state both versions and which document is newer.",w:"Extracting quotes before answering is one of the strongest anti-hallucination patterns."},
+  expert:{t:"Grounded technical answer",p:"You are a support engineer. Answer using ONLY the knowledge-base articles provided.\n\n<kb>\n<article id=\"KB0012\" updated=\"2026-03\">…</article>\n<article id=\"KB0045\" updated=\"2025-01\">…</article>\n<article id=\"KB0099\" updated=\"2026-08\">…</article>\n</kb>\n\nUser question: \"Email notifications stopped after the upgrade — how do I fix it?\"\n\nRules:\n- Prefer the most recently updated article if they conflict.\n- Give numbered fix steps, each citing its KB ID.\n- If steps are missing for the user's version, say what's missing and suggest escalation.\n- Never invent menu paths or property names not present in the articles.",w:"Handles recency conflicts and forbids invented technical details."},
+  complex:{t:"Retrieval-aware research answer",p:"<context>\n[12 retrieved chunks, each with id, source, date, relevance_score]\n</context>\n\nQuestion: \"How has our customer churn changed after the 2026 pricing update, and what are the top reasons?\"\n\nInstructions:\n1. Discard chunks with relevance_score < 0.5 or unrelated content; list which you discarded and why.\n2. Group remaining evidence into: quantitative (numbers) and qualitative (reasons).\n3. Answer in sections: Trend, Top reasons (ranked), Confidence.\n4. Cite chunk IDs for every claim.\n5. List 'Evidence gaps' — questions the context cannot answer, and what data to retrieve next.\n\nNever use outside knowledge for numbers.",w:"The model also judges retrieval quality and proposes follow-up retrieval — advanced RAG practice."}
+ }
+},
+/* ---------------- 16. ART ---------------- */
+{
+ id:"art", cat:"tools", name:"Automatic Reasoning & Tool-Use (ART)", tagline:"Reason, then call calculators, search & APIs.",
+ what:"Automatic Reasoning and Tool-use combines step-by-step reasoning with calls to external tools such as calculators, search engines, code runners or APIs. The model decides when its own knowledge isn't enough, pauses to call the right tool with the right inputs, then continues reasoning with the result. This handles precise maths, live data and actions in other systems that language models alone can't do reliably. In practice you describe the available tools and the format for calling them, and the system executes the calls.",
+ keys:[
+  ["Describe each tool clearly","Name, purpose, inputs, output format."],
+  ["Show the call format","A consistent syntax the system can parse."],
+  ["Say when to use tools","'Use the calculator for all arithmetic.'"],
+  ["Feed results back in","The model continues reasoning from the tool output."],
+  ["Handle tool failures","Tell it what to do if a tool errors or returns nothing."],
+  ["Limit and log calls","Cap the number of calls; keep a trace."]
+ ],
+ ex:{
+  low:{t:"Calculator tool",p:"You have a tool: calculator(expression) → number.\nUse it for any arithmetic. Format: CALL calculator(\"...\")\n\nQuestion: What is 18.5% of 46,780, rounded to 2 decimals?",w:"Offloads precise arithmetic to a deterministic tool."},
+  med:{t:"Search + reasoning",p:"Tools:\n- web_search(query) → top 5 results with snippets\n\nQuestion: Is the Kochi Metro currently operating a line to the airport?\n\nThink about what you need to know, call web_search with a focused query, then answer citing the result. If results are inconclusive, say so.",w:"Reasoning decides what to search; the tool supplies current facts."},
+  high:{t:"Multiple tools in sequence",p:"Tools:\n- get_weather(city, date) → {temp_c, rain_prob}\n- currency_convert(amount, from, to) → number\n- calculator(expr) → number\n\nTask: I'm travelling to Singapore on 15 Dec with a budget of ₹60,000. Daily costs ≈ SGD 180.\n1. Check the weather.\n2. Convert my budget to SGD.\n3. Calculate how many full days I can afford.\n4. Give packing advice based on the weather.\n\nShow each tool call and its result before continuing.",w:"Chains three tools with reasoning between each call."},
+  expert:{t:"Platform API tool use",p:"You can call these tools:\n- query_table(table, encoded_query, fields[]) → rows\n- get_record(table, sys_id) → record\n- calculator(expr)\n\nGoal: Report the average resolution time (hours) of P1 incidents for the Network group in the last 30 days, and identify the slowest one.\n\nRules:\n- Plan your calls first (numbered list), then execute.\n- Never guess field names; if a call returns an error, adjust and retry once.\n- Use calculator for averages.\n- Final output: one-paragraph summary + table of top 3 slowest.",w:"Plan → execute → recover from errors — realistic agentic tool use."},
+  complex:{t:"Tool selection & guardrails",p:"Available tools:\n- search_docs(query) → internal policy snippets\n- run_python(code) → stdout\n- send_email(to, subject, body) → status   ⚠ REQUIRES user confirmation\n- create_ticket(summary, priority) → ticket_id\n\nTask: Analyse the attached expense CSV (path: data/expenses.csv) for policy violations and notify the finance team.\n\nInstructions:\n1. Use search_docs to find the expense policy limits.\n2. Use run_python to load the CSV and flag rows over limits (show code).\n3. Summarise violations by employee.\n4. Draft the email but DO NOT call send_email — show the draft and ask me to confirm.\n5. If violations > ₹50,000 total, create a P2 ticket.\n6. Keep a numbered trace of every tool call and result.",w:"Combines retrieval, code execution and actions with an explicit human-confirmation guardrail."}
+ }
+},
+/* ---------------- 17. PAL ---------------- */
+{
+ id:"pal", cat:"tools", name:"Program-Aided Language Models (PAL)", tagline:"Let code do the computing.",
+ what:"Program-aided prompting asks the model to express its reasoning as code (usually Python) instead of prose, and then runs that code to get the answer. The language model handles understanding the problem; the interpreter handles exact calculation, date maths, data processing or visualisation. This removes the arithmetic and logic slips that plague pure text reasoning. It is ideal for word problems, data analysis, financial calculations and anything producing a chart or table.",
+ keys:[
+  ["Ask for code, not prose maths","'Write Python that computes the answer.'"],
+  ["Comments = reasoning","Each step explained as a code comment."],
+  ["Specify language & libraries","e.g., Python with pandas and matplotlib only."],
+  ["Print the final answer","Clearly labelled output."],
+  ["Run the code","The interpreter, not the model, gives the number."],
+  ["Use for precise or data tasks","Dates, money, statistics, charts."]
+ ],
+ ex:{
+  low:{t:"Word problem as code",p:"Write Python code to solve this, with a comment for each step, and print the answer:\n\"Riya has 3 boxes with 24 pencils each. She gives away 17 pencils and buys 2 packs of 10. How many pencils does she have?\"",w:"Arithmetic is executed, not guessed."},
+  med:{t:"Date calculation",p:"Write Python (datetime only) to answer:\n\"A project starts on 2026-11-02 and needs 45 working days (Mon–Fri, excluding 2026-11-14 and 2026-12-25). What is the end date?\"\nPrint the date and the number of calendar days elapsed.",w:"Working-day maths is a classic source of LLM errors — code fixes it."},
+  high:{t:"Loan comparison",p:"Write Python to compare two home-loan offers for ₹50,00,000:\nA) 8.4% for 20 years\nB) 8.1% for 20 years + ₹75,000 processing fee\n\nCompute EMI, total interest and total cost for each. Print a neat comparison table and state which is cheaper overall and by how much. Use the standard EMI formula; explain it in a comment.",w:"Financial formulas executed exactly, with a comparison table."},
+  expert:{t:"Data analysis + chart",p:"You will receive a CSV with columns: date, region, product, units, revenue.\n\nWrite a single Python script (pandas + matplotlib) that:\n1. Parses dates and handles missing revenue by units × median price per product.\n2. Computes monthly revenue by region.\n3. Finds the month-over-month growth % and flags drops > 10%.\n4. Saves a line chart (one line per region) as revenue.png.\n5. Prints a summary table of flagged drops.\n\nComment every block with the reasoning. Don't explain outside the code.",w:"PAL for real data work — cleaning, analysis and a visualisation output."},
+  complex:{t:"Simulation for decision-making",p:"Our support queue: tickets arrive on average 14/hour (Poisson). Each agent resolves one ticket in an exponential time with mean 12 minutes. SLA: 90% of tickets start within 10 minutes.\n\nWrite a Python discrete-event simulation (standard library + numpy only) that:\n- Simulates 8-hour shifts, 500 runs each, for 2 to 6 agents\n- Measures % of tickets meeting the SLA and average wait\n- Prints a table: agents | SLA % | avg wait | 95th pct wait\n- Recommends the minimum agents that meet the SLA in ≥ 95% of runs\n\nUse a fixed random seed. Explain the model assumptions in a docstring.",w:"Turns an analytical question into a simulation — computation the model could never do reliably in text."}
+ }
+},
+/* ---------------- 18. REACT ---------------- */
+{
+ id:"react", cat:"tools", name:"ReAct (Reason + Act)", tagline:"Thought → Action → Observation loop.",
+ what:"ReAct interleaves reasoning and acting: the model writes a Thought about what to do, takes an Action (such as a search or API call), reads the Observation that comes back, and repeats until it can give a Final Answer. Reasoning keeps actions purposeful, and observations keep reasoning grounded in real data. It's the foundation of most AI agents and is excellent for multi-step research, troubleshooting and tasks requiring information gathering. The visible trace also makes the agent's behaviour easy to audit.",
+ keys:[
+  ["Define the loop format","Thought / Action / Observation / … / Final Answer."],
+  ["List allowed actions","Names, inputs, what each returns."],
+  ["One action per step","Then wait for the observation."],
+  ["Ground thoughts in observations","Never assume an action's result."],
+  ["Set a step limit","Prevents endless loops."],
+  ["Define the stop condition","When enough evidence exists, give the Final Answer."]
+ ],
+ ex:{
+  low:{t:"Single loop",p:"Answer using this format:\nThought: …\nAction: search[query]\nObservation: (I will provide)\nFinal Answer: …\n\nQuestion: Who is the current CEO of the company that makes the Pixel phone?",w:"Even one Thought→Action cycle prevents answering from stale memory."},
+  med:{t:"Multi-hop question",p:"Use Thought / Action / Observation steps. Actions: search[query], lookup[term].\nMax 5 steps.\n\nQuestion: Which is taller — the tallest building in Mumbai or the tallest building in Kuala Lumpur — and by how many metres?",w:"Requires two lookups plus a comparison — natural ReAct territory."},
+  high:{t:"Troubleshooting agent",p:"You are a troubleshooting agent. Actions available:\n- check_service(name) → status\n- read_logs(service, minutes) → last log lines\n- ping(host) → latency or timeout\n\nProblem: \"Users can't upload files since 10:05.\"\n\nLoop: Thought → Action → Observation. Max 8 steps.\nAfter each observation, state which hypotheses are now more or less likely.\nFinish with: Root cause, Evidence, Recommended fix.",w:"Hypothesis tracking makes each action purposeful and the conclusion evidence-based."},
+  expert:{t:"Research with a budget",p:"Goal: Produce a one-page brief on 'adoption of passkeys by Indian banks in 2026'.\n\nActions: web_search[q], open_url[url], note[text]\nRules:\n- Max 10 actions total; state remaining budget in each Thought.\n- Prefer primary sources (bank sites, regulators) over blogs.\n- Use note[] to save each key fact with its source.\n- If two sources conflict, open a third.\n\nFinal Answer: brief with sections (Status, Key players, Barriers, Outlook) and a source list built from your notes.",w:"Budgeted actions, source preferences and a note-taking memory — a disciplined research agent."},
+  complex:{t:"Agent with write actions & safety",p:"You are an ops agent for an ITSM platform.\n\nRead actions (free to use): query_incidents[filter], get_ci[name], get_changes[ci, hours]\nWrite actions (REQUIRE approval): update_incident[id, fields], create_problem[summary, linked_ids]\n\nTask: 40+ incidents about \"VPN disconnects\" were raised in the last 2 hours. Investigate and coordinate.\n\nProcess:\n1. Thought/Action/Observation loop using read actions to find common CI, recent changes and patterns.\n2. When confident (state confidence %), PROPOSE write actions as a numbered plan — do not execute.\n3. Wait for \"APPROVED\" before any write action.\n4. After approval, execute, observe results, and report.\n\nMax 12 read actions. If confidence stays < 70%, stop and escalate with your evidence.",w:"Separates read vs. write actions with a human-approval gate and confidence threshold — production-safe ReAct."}
+ }
+}
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const store = {
+  get(k,d){try{const v=localStorage.getItem("pa_"+k);return v===null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("pa_"+k,JSON.stringify(v))}catch(e){}}
+};
+let done = new Set(store.get("done",[]));
+let current = 0;
+let viewMode = store.get("view","tabs");  // tabs | accordion
+let activeLevel = 0;
+let closedCats = new Set(store.get("closedCats",[]));
+
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* order techniques by category for navigation */
+const ORDER = [];
+Object.keys(CATS).forEach(c => T.forEach((t,i) => { if(t.cat===c) ORDER.push(i); }));
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+const ICON_CHEV = '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+const ICON_CHECK = '<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+function buildNav(){
+  const q = $("#search").value.trim().toLowerCase();
+  let html = "", any = false;
+  Object.entries(CATS).forEach(([ck,cat])=>{
+    const items = ORDER.filter(i=>T[i].cat===ck).filter(i=>{
+      if(!q) return true;
+      const t=T[i]; return (t.name+" "+t.tagline+" "+t.what).toLowerCase().includes(q);
+    });
+    if(!items.length) return;
+    any = true;
+    const closed = closedCats.has(ck) && !q;
+    html += `<div class="cat ${closed?"closed":""}" data-cat="${ck}">
+      <button class="cat-head" title="${cat.name}"><span class="cat-dot" style="background:${cat.color}"></span><span class="cat-label">${cat.name}</span><span class="cat-count">${items.length}</span>${ICON_CHEV}</button>
+      <div class="cat-body"><div>`;
+    items.forEach(i=>{
+      const pos = ORDER.indexOf(i)+1;
+      html += `<button class="nav-item ${i===current?"active":""} ${done.has(T[i].id)?"done":""}" data-i="${i}" title="${T[i].name}">
+        <span class="num">${pos}</span><span class="nm">${T[i].name}</span>${ICON_CHECK}</button>`;
+    });
+    html += `</div></div></div>`;
+  });
+  $("#nav").innerHTML = html;
+  $("#emptyNav").style.display = any ? "none" : "block";
+}
+$("#nav").addEventListener("click",e=>{
+  const head = e.target.closest(".cat-head");
+  if(head){
+    if($("#app").classList.contains("collapsed")) return;
+    const c = head.parentElement, k = c.dataset.cat;
+    c.classList.toggle("closed");
+    c.classList.contains("closed") ? closedCats.add(k) : closedCats.delete(k);
+    store.set("closedCats",[...closedCats]);
+    return;
+  }
+  const it = e.target.closest(".nav-item");
+  if(it){ go(+it.dataset.i); $("#app").classList.remove("mobile-open"); }
+});
+$("#search").addEventListener("input",buildNav);
+$("#collapseBtn").addEventListener("click",()=>{
+  $("#app").classList.toggle("collapsed");
+  store.set("collapsed",$("#app").classList.contains("collapsed"));
+});
+$("#menuBtn").addEventListener("click",()=>$("#app").classList.add("mobile-open"));
+$("#scrim").addEventListener("click",()=>$("#app").classList.remove("mobile-open"));
+if(store.get("collapsed",false)) $("#app").classList.add("collapsed");
+
+function updateProgress(){
+  $("#progTxt").textContent = `${done.size} / ${T.length}`;
+  $("#progBar").style.width = (done.size/T.length*100)+"%";
+}
+
+/* ============================================================
+   MAIN RENDER
+   ============================================================ */
+function hlPrompt(p){
+  let s = esc(p);
+  s = s.replace(/(&lt;\/?[a-zA-Z_][\w-]*(?:\s[^&]*?)?&gt;)/g,'<span class="tg">$1</span>');
+  s = s.replace(/^((?:PROMPT|Step|STEP|Round|Phase|Part|Level|Variant|Attempt)\s?[\w\d—\-]*[^\n:]*:)/gm,'<span class="hl">$1</span>');
+  return s;
+}
+const ICON_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+const ICON_BULB = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/></svg>';
+
+function exampleBody(t,lv){
+  const e = t.ex[lv.k];
+  return `<pre class="prompt">${hlPrompt(e.p)}</pre>
+    <div class="why">${ICON_BULB}<div><b>Why it works:</b> ${esc(e.w)}</div></div>`;
+}
+
+function renderExamples(t){
+  if(viewMode==="tabs"){
+    const lv = LEVELS[activeLevel], e = t.ex[lv.k];
+    return `<div class="tabs" id="tabs">
+        <div class="tab-ind" id="tabInd"></div>
+        ${LEVELS.map((l,i)=>`<button class="tab ${i===activeLevel?"on":""}" data-l="${i}" style="--c:${l.c}"><i></i>${l.label}</button>`).join("")}
+      </div>
+      <div class="tab-panel" key="${activeLevel}">
+        <div class="ex">
+          <div class="ex-meta"><span class="lvl" style="--c:${lv.c}">${lv.label}</span><h3>${esc(e.t)}</h3>
+            <button class="copy" data-copy="${lv.k}">${ICON_COPY}<span>Copy</span></button></div>
+          ${exampleBody(t,lv)}
+        </div>
+      </div>`;
+  }
+  return `<div class="acc">${LEVELS.map((l,i)=>`
+    <div class="acc-item ${i===activeLevel?"open":""}" data-l="${i}">
+      <button class="acc-btn"><span class="lvl" style="--c:${l.c}">${l.label}</span><h3>${esc(t.ex[l.k].t)}</h3>${ICON_CHEV}</button>
+      <div class="acc-body"><div><div class="acc-inner">
+        <div class="acc-tools"><button class="copy" data-copy="${l.k}">${ICON_COPY}<span>Copy</span></button></div>
+        ${exampleBody(t,l)}
+      </div></div></div>
+    </div>`).join("")}</div>`;
+}
+
+function render(){
+  const t = T[current], cat = CATS[t.cat];
+  const pos = ORDER.indexOf(current);
+  const prev = pos>0 ? T[ORDER[pos-1]] : null;
+  const next = pos<ORDER.length-1 ? T[ORDER[pos+1]] : null;
+  const isDone = done.has(t.id);
+  $("#crumb").innerHTML = `${cat.name} &nbsp;/&nbsp; <b>${t.name}</b>`;
+
+  $("#content").innerHTML = `
+    <section class="card hero fade" style="--hero-c:${cat.color}33">
+      <span class="pill"><i style="background:${cat.color}"></i>${cat.name} · Technique ${pos+1} of ${T.length}</span>
+      <h1>${t.name}</h1>
+      <div class="tagline">${t.tagline}</div>
+      <p>${t.what}</p>
+      <div class="hero-actions">
+        <button class="btn primary ${isDone?"on":""}" id="doneBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          ${isDone?"Learned ✓":"Mark as learned"}</button>
+        <button class="btn" id="jumpEx">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          Jump to examples</button>
+      </div>
+    </section>
+
+    <section class="card fade">
+      <div class="sec-title"><div class="sec-ic">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2"/></svg>
+      </div><div><h2>How to use it</h2><small>The keys to applying this technique well</small></div></div>
+      <div class="keys">${t.keys.map((k,i)=>`<div class="key"><span class="kn">${i+1}</span><div><b>${esc(k[0])}</b><span>${esc(k[1])}</span></div></div>`).join("")}</div>
+    </section>
+
+    <section class="card fade" id="exSec">
+      <div class="ex-head">
+        <div class="sec-title" style="margin:0"><div class="sec-ic">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+        </div><div><h2>Examples by level</h2><small>Low → Medium → High → Expert → Complex</small></div></div>
+        <div class="seg" id="seg">
+          <div class="slider" id="segSlider"></div>
+          <button data-v="tabs" class="${viewMode==="tabs"?"on":""}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v5"/></svg>Tabs</button>
+          <button data-v="accordion" class="${viewMode==="accordion"?"on":""}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Accordion</button>
+        </div>
+      </div>
+      <div id="exWrap">${renderExamples(t)}</div>
+    </section>
+
+    <nav class="pager fade">
+      <button class="pg prev" ${prev?"":"disabled"} data-i="${prev?ORDER[pos-1]:""}"><small>← Previous</small><b>${prev?prev.name:"—"}</b></button>
+      <button class="pg next" ${next?"":"disabled"} data-i="${next?ORDER[pos+1]:""}"><small>Next →</small><b>${next?next.name:"—"}</b></button>
+    </nav>`;
+  requestAnimationFrame(()=>{moveSeg();moveTabInd();});
+}
+
+function rerenderExamples(){
+  $("#exWrap").innerHTML = renderExamples(T[current]);
+  requestAnimationFrame(moveTabInd);
+}
+function moveTabInd(){
+  const ind = $("#tabInd"); if(!ind) return;
+  const on = document.querySelector(".tab.on"); if(!on) return;
+  ind.style.left = on.offsetLeft+"px"; ind.style.width = on.offsetWidth+"px";
+  ind.style.setProperty("--ind-c", LEVELS[activeLevel].c);
+}
+function moveSeg(){
+  const s = $("#segSlider"), on = document.querySelector("#seg button.on"); if(!s||!on) return;
+  s.style.left = on.offsetLeft+"px"; s.style.width = on.offsetWidth+"px";
+}
+
+/* delegated events in content */
+$("#content").addEventListener("click",e=>{
+  const tab = e.target.closest(".tab");
+  if(tab){ activeLevel = +tab.dataset.l; rerenderExamples(); return; }
+
+  const segb = e.target.closest("#seg button");
+  if(segb && segb.dataset.v!==viewMode){
+    viewMode = segb.dataset.v; store.set("view",viewMode);
+    document.querySelectorAll("#seg button").forEach(b=>b.classList.toggle("on",b===segb));
+    moveSeg(); rerenderExamples(); return;
+  }
+
+  const copy = e.target.closest(".copy");
+  if(copy){
+    e.stopPropagation();
+    const txt = T[current].ex[copy.dataset.copy].p;
+    const ok = ()=>{copy.classList.add("ok");copy.querySelector("span").textContent="Copied";toast("Prompt copied to clipboard");
+      setTimeout(()=>{copy.classList.remove("ok");copy.querySelector("span").textContent="Copy"},1600)};
+    if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(txt).then(ok).catch(()=>fallbackCopy(txt)&&ok()); }
+    else if(fallbackCopy(txt)) ok();
+    return;
+  }
+
+  const accb = e.target.closest(".acc-btn");
+  if(accb){
+    const item = accb.parentElement;
+    item.classList.toggle("open");
+    if(item.classList.contains("open")) activeLevel = +item.dataset.l;
+    return;
+  }
+
+  if(e.target.closest("#doneBtn")){
+    const id = T[current].id;
+    if(done.has(id)){done.delete(id);toast("Unmarked")}else{done.add(id);toast("Nice — marked as learned 🎉")}
+    store.set("done",[...done]); updateProgress(); buildNav();
+    const b=$("#doneBtn"); b.classList.toggle("on",done.has(id));
+    b.lastChild.textContent = done.has(id)?" Learned ✓":" Mark as learned";
+    return;
+  }
+  if(e.target.closest("#jumpEx")){ $("#exSec").scrollIntoView({behavior:"smooth",block:"start"}); return; }
+
+  const pg = e.target.closest(".pg");
+  if(pg && pg.dataset.i!=="") go(+pg.dataset.i);
+});
+
+function fallbackCopy(txt){
+  try{const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();
+    const r=document.execCommand("copy");ta.remove();return r;}catch(e){return false}
+}
+let toastT;
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1800)}
+
+function go(i){
+  current = i; activeLevel = 0;
+  try{history.replaceState(null,"","#"+T[i].id)}catch(e){}
+  render(); buildNav();
+  $("#main").scrollTo({top:0,behavior:"smooth"});
+  const a = document.querySelector(".nav-item.active"); if(a) a.scrollIntoView({block:"nearest"});
+}
+
+/* keyboard */
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"){ if(e.key==="Escape"){e.target.value="";buildNav();e.target.blur()} return; }
+  const pos = ORDER.indexOf(current);
+  if(e.key==="ArrowRight" && pos<ORDER.length-1) go(ORDER[pos+1]);
+  else if(e.key==="ArrowLeft" && pos>0) go(ORDER[pos-1]);
+  else if(/^[1-5]$/.test(e.key)){
+    activeLevel = +e.key-1; rerenderExamples();
+  }
+  else if(e.key==="/"){ e.preventDefault(); if($("#app").classList.contains("collapsed")) $("#app").classList.remove("collapsed"); $("#search").focus(); }
+});
+window.addEventListener("resize",()=>{moveSeg();moveTabInd();});
+
+/* init */
+const fromHash = T.findIndex(t=>"#"+t.id===location.hash);
+current = fromHash>=0 ? fromHash : ORDER[0];
+buildNav(); updateProgress(); render();
+</script>
+</body>
+</html>
