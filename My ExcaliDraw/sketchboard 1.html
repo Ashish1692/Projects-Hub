@@ -1,3 +1,16 @@
+function remeasureAll() {
+  const refresh = (els) => els.forEach((el) => { if (el.type === 'text') { if (el.containerId) delete el._wk; else measureText(el); bump(el); } });
+  refresh(state.elements);
+  state.library.forEach((i) => refresh(i.elements));
+  if ($('#library').classList.contains('open')) renderLibrary();
+  requestRender();
+}
+if (document.fonts) {
+  document.fonts.addEventListener?.('loadingdone', remeasureAll);
+  const used = new Set(['20px Virgil', '600 14px Nunito']);
+  for (const el of state.elements) if (el.type === 'text') used.add(`20px ${FONTS[el.fontFamily] || FONTS[1]}`);
+  Promise.allSettled([...used].map((f) => document.fonts.load(f))).then(remeasureAll);
+}
 <!DOCTYPE html>
 <!--
   Sketchboard — an unofficial, single-file whiteboard inspired by Excalidraw.
@@ -6,7 +19,7 @@
   - Excalidraw (https://github.com/excalidraw/excalidraw), MIT License, Copyright (c) Excalidraw.
     The UX, hand-drawn look, keyboard shortcuts and .excalidraw file format follow Excalidraw.
   - Virgil hand-drawn font from the @excalidraw/excalidraw package.
-  - rough.js (MIT), perfect-freehand (MIT), Lucide icons (ISC), Google Fonts (Caveat, Nunito; OFL).
+  - rough.js (MIT), perfect-freehand (MIT), Lucide icons (ISC), Google Fonts (hand-drawn fonts + Nunito; OFL / Apache).
   Not affiliated with or endorsed by the Excalidraw project.
 -->
 <html lang="en">
@@ -19,7 +32,7 @@
 <meta name="description" content="Sketchboard: a hand-drawn style whiteboard inspired by Excalidraw." />
 <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Kalam&family=Patrick+Hand&family=Indie+Flower&family=Architects+Daughter&family=Gochi+Hand&family=Shadows+Into+Light&family=Gloria+Hallelujah&family=Permanent+Marker&family=Comic+Neue:wght@400;700&family=Nanum+Pen+Script&family=Reenie+Beanie&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
 <style>
   @font-face {
     font-family: 'Virgil';
@@ -135,6 +148,20 @@
   kbd { background: var(--ui-hover); border-radius: 4px; padding: 1px 6px; font-family: inherit; font-size: 12px; border: 1px solid var(--ui-border); white-space: nowrap; }
   #toast { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); padding: 10px 16px; font-size: 13px; z-index: 60; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #toast.show { opacity: 1; }
+  #shapePicker { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 30; width: 372px; padding: 10px 12px 12px; display: none; max-height: calc(100vh - 140px); overflow-y: auto; }
+  #shapePicker.open { display: block; }
+  .sp-cat { font-size: 11px; font-weight: 700; color: var(--ui-muted); margin: 8px 2px 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .sp-cat:first-child { margin-top: 0; }
+  .sp-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .sp-item { height: 38px; border: 1px solid transparent; border-radius: 8px; background: var(--ui-hover); cursor: pointer; display: grid; place-items: center; padding: 0; color: var(--ui-fg); }
+  .sp-item:hover { border-color: var(--accent); color: var(--accent); }
+  .sp-item svg { width: 28px; height: 24px; }
+  #ctxMenu { position: fixed; z-index: 45; width: 236px; padding: 6px; display: none; }
+  #ctxMenu.open { display: block; }
+  .num { width: 64px; height: 30px; border-radius: 7px; border: 1px solid var(--ui-border); background: var(--ui-hover); color: var(--ui-fg); padding: 0 6px; font: inherit; font-weight: 700; }
+  .sel { width: 100%; height: 32px; border-radius: 7px; border: 1px solid var(--ui-border); background: var(--ui-hover); color: var(--ui-fg); padding: 0 6px; font-size: 14px; }
+  .opt.wide { width: auto; padding: 0 8px; gap: 5px; display: inline-flex; align-items: center; font-weight: 600; }
+  .opt.wide svg { width: 15px; height: 15px; }
   #welcome .credit { margin-top: 14px; font-size: 12px; color: #a0a0ad; pointer-events: auto; }
   #welcome .credit a, .about a { color: var(--accent); text-decoration: none; font-weight: 700; }
   #welcome .credit a:hover, .about a:hover { text-decoration: underline; }
@@ -167,12 +194,15 @@
   <div class="menu-sep"></div>
   <button class="menu-item" data-action="library"><i data-lucide="library"></i>Library</button>
   <button class="menu-item" data-action="grid"><i data-lucide="grid-3x3"></i>Toggle grid<span class="sc">Ctrl+'</span></button>
+  <button class="menu-item" data-action="guides"><i data-lucide="magnet"></i>Smart guides: <b id="guidesState">On</b><span class="sc">Alt+S</span></button>
   <button class="menu-item" data-action="theme"><i data-lucide="moon"></i><span id="themeLabel">Dark mode</span><span class="sc">Alt+Shift+D</span></button>
   <button class="menu-item" data-action="help"><i data-lucide="help-circle"></i>Help &amp; shortcuts<span class="sc">?</span></button>
   <button class="menu-item" data-action="about"><i data-lucide="heart"></i>About &amp; credits</button>
 </div>
 
 <div id="toolbar" class="island"></div>
+<div id="shapePicker" class="island"></div>
+<div id="ctxMenu" class="island"></div>
 <div id="props" class="island" hidden></div>
 
 <button id="libBtn" class="island" data-action="library" title="Shape library"><i data-lucide="library"></i><span>Library</span></button>
@@ -241,6 +271,12 @@
       <div><span>Insert image</span><kbd>9</kbd></div>
       <div><span>Eraser</span><kbd>E / 0</kbd></div>
       <div><span>Frame</span><kbd>F</kbd></div>
+      <div><span>More shapes (geometric, flowchart, UML)</span><kbd>S</kbd></div>
+      <div><span>Pen → shape</span><kbd>Draw a shape with P</kbd></div>
+      <div><span>Smart guides on / off</span><kbd>Alt S</kbd></div>
+      <div><span>Skip snapping while dragging</span><kbd>Hold Ctrl</kbd></div>
+      <div><span>Font size smaller / larger</span><kbd>Ctrl Shift &lt; / &gt;</kbd></div>
+      <div><span>Layer / clipboard menu</span><kbd>Right-click</kbd></div>
       <div><span>Text inside shape</span><kbd>Double-click / Enter</kbd></div>
       <div><span>Label on arrow / line</span><kbd>Double-click</kbd></div>
       <div><span>Elbow arrow (routes around shapes)</span><kbd>Arrow type ▸ Elbow</kbd></div>
@@ -261,7 +297,7 @@
       <div><span>Draw from center</span><kbd>Alt</kbd></div>
       <div><span>Dark mode</span><kbd>Alt Shift D</kbd></div>
     </div>
-    <p style="font-size:13px;color:var(--ui-muted);margin:14px 0 0">Arrows snap to shapes when you start or end them on a shape, and follow when the shape moves. Drop images or <code>.excalidraw</code> / <code>.excalidrawlib</code> files anywhere on the canvas. Choose <b>Arrow type ▸ Elbow</b> for right-angled arrows that automatically route around shapes.</p>
+    <p style="font-size:13px;color:var(--ui-muted);margin:14px 0 0">Arrows snap to shapes when you start or end them on a shape, and follow when the shape moves. Drop images or <code>.excalidraw</code> / <code>.excalidrawlib</code> files anywhere on the canvas. Choose <b>Arrow type ▸ Elbow</b> for right-angled arrows that automatically route around shapes. With the pen (P), draw a rough rectangle, circle, triangle, diamond, line or arrow and it becomes a clean shape. Pick <b>Hold</b> in the pen options to convert only when you pause at the end of a stroke, or <b>Off</b> to keep freehand.</p>
     <p style="font-size:12.5px;color:var(--ui-muted);margin:10px 0 0">Sketchboard is inspired by <a href="https://github.com/excalidraw/excalidraw" target="_blank" rel="noopener" style="color:var(--accent)">Excalidraw</a> (MIT). <a href="#" data-action="about" style="color:var(--accent)">See all credits</a>.</p>
   </div>
 </div>
@@ -279,7 +315,7 @@
       <li><a href="https://roughjs.com" target="_blank" rel="noopener">rough.js</a> — sketchy rendering (MIT)</li>
       <li><a href="https://github.com/steveruizok/perfect-freehand" target="_blank" rel="noopener">perfect-freehand</a> — pen strokes (MIT)</li>
       <li><a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> — icons (ISC)</li>
-      <li><a href="https://fonts.google.com" target="_blank" rel="noopener">Google Fonts</a> — Caveat &amp; Nunito (OFL)</li>
+      <li><a href="https://fonts.google.com" target="_blank" rel="noopener">Google Fonts</a> — Caveat, Kalam, Patrick Hand, Indie Flower, Architects Daughter, Gochi Hand, Shadows Into Light, Gloria Hallelujah, Permanent Marker, Comic Neue, Nanum Pen Script, Reenie Beanie &amp; Nunito (see each font's licence on Google Fonts)</li>
     </ul>
     <p class="muted">Sketchboard is not affiliated with, endorsed by, or sponsored by the Excalidraw project. “Excalidraw” is used here only to give credit.</p>
   </div>
@@ -297,11 +333,26 @@ import { getStroke } from 'https://esm.sh/perfect-freehand@1.2.2';
 /* ============================================================
    Constants
    ============================================================ */
-const FONTS = {
-  1: 'Virgil, Caveat, "Segoe Print", "Comic Sans MS", cursive',
-  2: 'Nunito, Helvetica, Arial, sans-serif',
-  3: '"Cascadia Code", "Cascadia Mono", Consolas, "Courier New", monospace',
-};
+const GF_URL = 'https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Kalam&family=Patrick+Hand&family=Indie+Flower&family=Architects+Daughter&family=Gochi+Hand&family=Shadows+Into+Light&family=Gloria+Hallelujah&family=Permanent+Marker&family=Comic+Neue:wght@400;700&family=Nanum+Pen+Script&family=Reenie+Beanie&family=Nunito:wght@400;600;700&display=swap';
+const HAND = 'Virgil, "Segoe Print", "Comic Sans MS", cursive';
+const FONT_LIST = [
+  { id: 1, name: 'Virgil (Excalidraw)', css: 'Virgil, Caveat, "Segoe Print", "Comic Sans MS", cursive', group: 'Hand-drawn' },
+  { id: 101, name: 'Caveat', css: `Caveat, ${HAND}`, group: 'Hand-drawn' },
+  { id: 102, name: 'Kalam', css: `Kalam, ${HAND}`, group: 'Hand-drawn' },
+  { id: 103, name: 'Patrick Hand', css: `"Patrick Hand", ${HAND}`, group: 'Hand-drawn' },
+  { id: 104, name: 'Indie Flower', css: `"Indie Flower", ${HAND}`, group: 'Hand-drawn' },
+  { id: 105, name: 'Architects Daughter', css: `"Architects Daughter", ${HAND}`, group: 'Hand-drawn' },
+  { id: 106, name: 'Gochi Hand', css: `"Gochi Hand", ${HAND}`, group: 'Hand-drawn' },
+  { id: 107, name: 'Shadows Into Light', css: `"Shadows Into Light", ${HAND}`, group: 'Hand-drawn' },
+  { id: 108, name: 'Gloria Hallelujah', css: `"Gloria Hallelujah", ${HAND}`, group: 'Hand-drawn' },
+  { id: 109, name: 'Permanent Marker', css: `"Permanent Marker", ${HAND}`, group: 'Hand-drawn' },
+  { id: 110, name: 'Comic Neue', css: `"Comic Neue", "Comic Sans MS", ${HAND}`, group: 'Hand-drawn' },
+  { id: 111, name: 'Nanum Pen Script', css: `"Nanum Pen Script", ${HAND}`, group: 'Hand-drawn' },
+  { id: 112, name: 'Reenie Beanie', css: `"Reenie Beanie", ${HAND}`, group: 'Hand-drawn' },
+  { id: 2, name: 'Nunito', css: 'Nunito, Helvetica, Arial, sans-serif', group: 'Normal' },
+  { id: 3, name: 'Code (Cascadia)', css: '"Cascadia Code", "Cascadia Mono", Consolas, "Courier New", monospace', group: 'Code' },
+];
+const FONTS = Object.fromEntries(FONT_LIST.map((f) => [f.id, f.css]));
 const LINE_H = 1.25;
 const SEL = '#6965db';
 const GRID = 20;
@@ -309,9 +360,9 @@ const STORAGE_KEY = 'sketchboard-scene-v1';
 const LIB_KEY = 'sketchboard-library-v1';
 const STROKES = ['#1e1e1e', '#e03131', '#2f9e44', '#1971c2', '#f08c00'];
 const BGS = ['transparent', '#ffc9c9', '#b2f2bb', '#a5d8ff', '#ffec99'];
-const CONTAINERS = ['rectangle', 'diamond', 'ellipse'];
-const BINDABLE = ['rectangle', 'diamond', 'ellipse', 'text', 'image'];
-const ELEMENT_TYPES = ['rectangle', 'diamond', 'ellipse', 'line', 'arrow', 'freedraw', 'text', 'image', 'frame', 'magicframe'];
+const CONTAINERS = ['rectangle', 'diamond', 'ellipse', 'shape'];
+const BINDABLE = ['rectangle', 'diamond', 'ellipse', 'text', 'image', 'shape'];
+const ELEMENT_TYPES = ['rectangle', 'diamond', 'ellipse', 'line', 'arrow', 'freedraw', 'text', 'image', 'frame', 'magicframe', 'shape'];
 const BOUND_PAD = 5;
 const LABEL_MAX_W = 220;
 const BIND_GAP = 6;
@@ -321,6 +372,7 @@ const TOOLS = [
   { id: 'rectangle', icon: 'square', key: '2', title: 'Rectangle — R or 2' },
   { id: 'diamond', icon: 'diamond', key: '3', title: 'Diamond — D or 3' },
   { id: 'ellipse', icon: 'circle', key: '4', title: 'Ellipse — O or 4' },
+  { id: 'shapes', icon: 'shapes', key: 'S', title: 'More shapes: geometric, flowchart, UML — S' },
   { id: 'arrow', icon: 'move-right', key: '5', title: 'Arrow — A or 5' },
   { id: 'line', icon: 'minus', key: '6', title: 'Line — L or 6' },
   { id: 'freedraw', icon: 'pencil', key: '7', title: 'Draw — P or 7' },
@@ -343,8 +395,213 @@ const PROPS_BY_TYPE = {
   text: ['strokeColor', 'fontSize', 'fontFamily', 'textAlign', 'opacity'],
   image: ['opacity'],
   frame: [],
+  shape: ['strokeColor', 'backgroundColor', 'fillStyle', 'strokeWidth', 'strokeStyle', 'roughness', 'opacity'],
+  polygon: ['strokeColor', 'backgroundColor', 'fillStyle', 'strokeWidth', 'strokeStyle', 'roughness', 'opacity'],
 };
 const applies = (type, prop) => (PROPS_BY_TYPE[type] || []).includes(prop);
+
+/* ============================================================
+   Extra diagram shapes (geometric, flowchart, UML)
+   Path commands in local coords for a w×h box:
+   ['M',x,y] ['L',x,y] ['Q',cx,cy,x,y] ['C',x1,y1,x2,y2,x,y] ['A',cx,cy,rx,ry,deg0,deg1] ['Z']
+   ============================================================ */
+const normPts = (raw, w, h) => {
+  const xs = raw.map((p) => p[0]), ys = raw.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  return raw.map(([x, y]) => [((x - x0) / (x1 - x0 || 1)) * w, ((y - y0) / (y1 - y0 || 1)) * h]);
+};
+const regRaw = (n, rot) => Array.from({ length: n }, (_, i) => { const a = rot + (i * 2 * Math.PI) / n; return [Math.cos(a), Math.sin(a)]; });
+const starRaw = (n, inner) => Array.from({ length: n * 2 }, (_, i) => { const a = -Math.PI / 2 + (i * Math.PI) / n, r = i % 2 ? inner : 1; return [r * Math.cos(a), r * Math.sin(a)]; });
+const polySegs = (pts) => [['M', ...pts[0]], ...pts.slice(1).map((p) => ['L', ...p]), ['Z']];
+const rectSegs = (x, y, w, h) => polySegs([[x, y], [x + w, y], [x + w, y + h], [x, y + h]]);
+const lineSegs = (...pts) => [['M', ...pts[0]], ...pts.slice(1).map((p) => ['L', ...p])];
+const ellSegs = (cx, cy, rx, ry) => [['M', cx + rx, cy], ['A', cx, cy, rx, ry, 0, 360], ['Z']];
+const below = (w, h) => [-w * 1.2, h + 4, w * 3.4, 40];
+
+const SHAPES = {
+  // ---- Basic geometric
+  triangle: { name: 'Triangle', outline: (w, h) => polySegs([[w / 2, 0], [w, h], [0, h]]), text: (w, h) => [w * 0.25, h * 0.45, w * 0.5, h * 0.5], size: [120, 100] },
+  rightTriangle: { name: 'Right triangle', outline: (w, h) => polySegs([[0, 0], [w, h], [0, h]]), text: (w, h) => [w * 0.04, h * 0.5, w * 0.5, h * 0.46], size: [110, 100] },
+  pentagon: { name: 'Pentagon', outline: (w, h) => polySegs(normPts(regRaw(5, -Math.PI / 2), w, h)), text: (w, h) => [w * 0.2, h * 0.3, w * 0.6, h * 0.55], size: [110, 105] },
+  hexagon: { name: 'Hexagon', outline: (w, h) => { const c = Math.min(w * 0.25, h * 0.5); return polySegs([[c, 0], [w - c, 0], [w, h / 2], [w - c, h], [c, h], [0, h / 2]]); },
+    text: (w, h) => { const c = Math.min(w * 0.25, h * 0.5); return [c * 0.6, h * 0.1, w - c * 1.2, h * 0.8]; }, size: [130, 100] },
+  octagon: { name: 'Octagon', outline: (w, h) => { const a = 0.29 * w, b = 0.29 * h; return polySegs([[a, 0], [w - a, 0], [w, b], [w, h - b], [w - a, h], [a, h], [0, h - b], [0, b]]); },
+    text: (w, h) => [w * 0.12, h * 0.12, w * 0.76, h * 0.76], size: [110, 110] },
+  star: { name: 'Star', outline: (w, h) => polySegs(normPts(starRaw(5, 0.45), w, h)), text: (w, h) => [w * 0.3, h * 0.38, w * 0.4, h * 0.32], size: [120, 115] },
+  parallelogram: { name: 'Parallelogram', outline: (w, h) => { const c = w * 0.2; return polySegs([[c, 0], [w, 0], [w - c, h], [0, h]]); },
+    text: (w, h) => [w * 0.16, h * 0.05, w * 0.68, h * 0.9], size: [150, 80] },
+  trapezoid: { name: 'Trapezoid', outline: (w, h) => { const c = w * 0.2; return polySegs([[c, 0], [w - c, 0], [w, h], [0, h]]); },
+    text: (w, h) => [w * 0.16, h * 0.05, w * 0.68, h * 0.9], size: [150, 90] },
+  cross: { name: 'Cross', outline: (w, h) => { const a = w / 3, b = h / 3; return polySegs([[a, 0], [2 * a, 0], [2 * a, b], [w, b], [w, 2 * b], [2 * a, 2 * b], [2 * a, h], [a, h], [a, 2 * b], [0, 2 * b], [0, b], [a, b]]); },
+    text: (w, h) => [w * 0.3, h * 0.33, w * 0.4, h * 0.34], size: [100, 100] },
+  blockArrow: { name: 'Block arrow', outline: (w, h) => { const d = Math.min(w * 0.4, h * 0.8); return polySegs([[0, h * 0.25], [w - d, h * 0.25], [w - d, 0], [w, h / 2], [w - d, h], [w - d, h * 0.75], [0, h * 0.75]]); },
+    text: (w, h) => [w * 0.03, h * 0.27, w - Math.min(w * 0.4, h * 0.8), h * 0.46], size: [150, 80] },
+  heart: { name: 'Heart', outline: (w, h) => [['M', w * 0.5, h * 0.25], ['C', w * 0.5, 0, 0, 0, 0, h * 0.3], ['C', 0, h * 0.6, w * 0.5, h * 0.8, w * 0.5, h], ['C', w * 0.5, h * 0.8, w, h * 0.6, w, h * 0.3], ['C', w, 0, w * 0.5, 0, w * 0.5, h * 0.25], ['Z']],
+    text: (w, h) => [w * 0.2, h * 0.22, w * 0.6, h * 0.4], size: [110, 100] },
+  cloud: { name: 'Cloud', outline: (w, h) => [['M', w * 0.25, h * 0.85], ['C', w * 0.05, h * 0.85, 0, h * 0.6, w * 0.15, h * 0.5], ['C', w * 0.05, h * 0.3, w * 0.25, h * 0.12, w * 0.4, h * 0.22],
+      ['C', w * 0.48, h * 0.02, w * 0.78, h * 0.05, w * 0.78, h * 0.27], ['C', w * 0.98, h * 0.25, w, h * 0.55, w * 0.88, h * 0.62], ['C', w * 0.98, h * 0.8, w * 0.8, h * 0.95, w * 0.65, h * 0.85],
+      ['C', w * 0.55, h * 0.98, w * 0.32, h * 0.98, w * 0.25, h * 0.85], ['Z']],
+    text: (w, h) => [w * 0.2, h * 0.32, w * 0.6, h * 0.42], size: [160, 110] },
+  callout: { name: 'Speech bubble', outline: (w, h) => { const b = h * 0.75, r = Math.min(12, w * 0.1, b * 0.15);
+      return [['M', r, 0], ['L', w - r, 0], ['Q', w, 0, w, r], ['L', w, b - r], ['Q', w, b, w - r, b], ['L', w * 0.4, b], ['L', w * 0.2, h], ['L', w * 0.25, b], ['L', r, b], ['Q', 0, b, 0, b - r], ['L', 0, r], ['Q', 0, 0, r, 0], ['Z']]; },
+    text: (w, h) => [w * 0.04, h * 0.04, w * 0.92, h * 0.67], size: [160, 110] },
+  // ---- Flowchart
+  terminator: { name: 'Terminator', outline: (w, h) => { const r = Math.min(h / 2, w / 2);
+      return [['M', r, 0], ['L', w - r, 0], ['A', w - r, h / 2, r, h / 2, -90, 90], ['L', r, h], ['A', r, h / 2, r, h / 2, 90, 270], ['Z']]; },
+    text: (w, h) => { const r = Math.min(h / 2, w / 2); return [r * 0.5, h * 0.08, w - r, h * 0.84]; }, size: [160, 60] },
+  predefined: { name: 'Predefined process', outline: (w, h) => rectSegs(0, 0, w, h),
+    extras: (w, h) => { const c = Math.min(w * 0.1, 16); return [{ segs: lineSegs([c, 0], [c, h]) }, { segs: lineSegs([w - c, 0], [w - c, h]) }]; },
+    text: (w, h) => { const c = Math.min(w * 0.1, 16); return [c + 3, h * 0.05, w - 2 * c - 6, h * 0.9]; }, size: [160, 70] },
+  document: { name: 'Document', outline: (w, h) => [['M', 0, 0], ['L', w, 0], ['L', w, h * 0.82], ['C', w * 0.72, h * 0.64, w * 0.36, h * 1.08, 0, h * 0.86], ['Z']],
+    text: (w, h) => [w * 0.05, h * 0.05, w * 0.9, h * 0.68], size: [150, 90] },
+  manualInput: { name: 'Manual input', outline: (w, h) => polySegs([[0, h * 0.28], [w, 0], [w, h], [0, h]]), text: (w, h) => [w * 0.05, h * 0.3, w * 0.9, h * 0.65], size: [150, 80] },
+  manualOperation: { name: 'Manual operation', outline: (w, h) => polySegs([[0, 0], [w, 0], [w * 0.8, h], [w * 0.2, h]]), text: (w, h) => [w * 0.18, h * 0.05, w * 0.64, h * 0.9], size: [150, 80] },
+  database: { name: 'Database', outline: (w, h) => { const r = Math.min(h * 0.15, w * 0.25);
+      return [['M', 0, r], ['A', w / 2, r, w / 2, r, 180, 360], ['L', w, h - r], ['A', w / 2, h - r, w / 2, r, 0, 180], ['Z']]; },
+    extras: (w, h) => { const r = Math.min(h * 0.15, w * 0.25); return [{ segs: [['M', 0, r], ['A', w / 2, r, w / 2, r, 180, 0]] }]; },
+    text: (w, h) => { const r = Math.min(h * 0.15, w * 0.25); return [w * 0.05, r * 2 + 2, w * 0.9, h - r * 3 - 4]; }, size: [110, 120] },
+  delay: { name: 'Delay', outline: (w, h) => { const r = Math.min(w / 2, h / 2); return [['M', 0, 0], ['L', w - r, 0], ['A', w - r, h / 2, r, h / 2, -90, 90], ['L', 0, h], ['Z']]; },
+    text: (w, h) => [w * 0.05, h * 0.1, w * 0.78, h * 0.8], size: [130, 80] },
+  display: { name: 'Display', outline: (w, h) => [['M', w * 0.15, 0], ['L', w * 0.8, 0], ['A', w * 0.8, h / 2, w * 0.2, h / 2, -90, 90], ['L', w * 0.15, h], ['L', 0, h / 2], ['Z']],
+    text: (w, h) => [w * 0.14, h * 0.1, w * 0.72, h * 0.8], size: [150, 80] },
+  internalStorage: { name: 'Internal storage', outline: (w, h) => rectSegs(0, 0, w, h),
+    extras: (w, h) => { const c = Math.min(w * 0.12, 18), d = Math.min(h * 0.15, 18); return [{ segs: lineSegs([c, 0], [c, h]) }, { segs: lineSegs([0, d], [w, d]) }]; },
+    text: (w, h) => { const c = Math.min(w * 0.12, 18), d = Math.min(h * 0.15, 18); return [c + 3, d + 3, w - c - 6, h - d - 6]; }, size: [130, 100] },
+  offPage: { name: 'Off-page connector', outline: (w, h) => polySegs([[0, 0], [w, 0], [w, h * 0.65], [w / 2, h], [0, h * 0.65]]), text: (w, h) => [w * 0.08, h * 0.05, w * 0.84, h * 0.6], size: [100, 100] },
+  merge: { name: 'Merge', outline: (w, h) => polySegs([[0, 0], [w, 0], [w / 2, h]]), text: (w, h) => [w * 0.25, h * 0.05, w * 0.5, h * 0.45], size: [110, 90] },
+  // ---- UML
+  umlClass: { name: 'Class', outline: (w, h) => rectSegs(0, 0, w, h),
+    extras: (w, h) => { const n = Math.min(34, h * 0.34), m = n + (h - n) / 2; return [{ segs: lineSegs([0, n], [w, n]) }, { segs: lineSegs([0, m], [w, m]) }]; },
+    text: (w, h) => [4, 2, w - 8, Math.min(34, h * 0.34) - 4], size: [170, 140] },
+  actor: { name: 'Actor', noOutline: true, outline: (w, h) => rectSegs(0, 0, w, h),
+    extras: (w, h) => { const r = Math.min(w * 0.22, h * 0.11);
+      return [{ segs: ellSegs(w / 2, r, r, r) }, { segs: lineSegs([w / 2, 2 * r], [w / 2, h * 0.62]) }, { segs: lineSegs([0, h * 0.34], [w, h * 0.34]) }, { segs: lineSegs([w * 0.08, h], [w / 2, h * 0.62], [w * 0.92, h]) }]; },
+    text: below, noGrow: true, size: [50, 100] },
+  component: { name: 'Component', outline: (w, h) => rectSegs(w * 0.12, 0, w * 0.88, h),
+    extras: (w, h) => [{ segs: rectSegs(0, h * 0.2, w * 0.24, h * 0.15), fill: 'bg' }, { segs: rectSegs(0, h * 0.55, w * 0.24, h * 0.15), fill: 'bg' }],
+    text: (w, h) => [w * 0.26, h * 0.05, w * 0.7, h * 0.9], size: [150, 90] },
+  package: { name: 'Package', outline: (w, h) => { const t = Math.min(h * 0.22, 22), tw = Math.min(w * 0.45, 90); return polySegs([[0, 0], [tw, 0], [tw, t], [w, t], [w, h], [0, h]]); },
+    extras: (w, h) => { const t = Math.min(h * 0.22, 22), tw = Math.min(w * 0.45, 90); return [{ segs: lineSegs([0, t], [tw, t]) }]; },
+    text: (w, h) => { const t = Math.min(h * 0.22, 22); return [w * 0.05, t + 4, w * 0.9, h - t - 8]; }, size: [160, 110] },
+  note: { name: 'Note', outline: (w, h) => { const c = Math.min(w * 0.22, h * 0.3, 22); return polySegs([[0, 0], [w - c, 0], [w, c], [w, h], [0, h]]); },
+    extras: (w, h) => { const c = Math.min(w * 0.22, h * 0.3, 22); return [{ segs: lineSegs([w - c, 0], [w - c, c], [w, c]) }]; },
+    text: (w, h) => { const c = Math.min(w * 0.22, h * 0.3, 22); return [w * 0.05, c * 0.6, w * 0.9 - c * 0.4, h - c * 0.9]; }, size: [150, 100] },
+  node3d: { name: 'Node', outline: (w, h) => { const d = Math.min(w * 0.15, h * 0.18, 18); return polySegs([[0, d], [d, 0], [w, 0], [w, h - d], [w - d, h], [0, h]]); },
+    extras: (w, h) => { const d = Math.min(w * 0.15, h * 0.18, 18); return [{ segs: lineSegs([0, d], [w - d, d], [w, 0]) }, { segs: lineSegs([w - d, d], [w - d, h]) }]; },
+    text: (w, h) => { const d = Math.min(w * 0.15, h * 0.18, 18); return [6, d + 4, w - d - 12, h - d - 8]; }, size: [160, 110] },
+  lifeline: { name: 'Lifeline', outline: (w, h) => rectSegs(0, 0, w, Math.min(40, h * 0.3)),
+    extras: (w, h) => [{ segs: lineSegs([w / 2, Math.min(40, h * 0.3)], [w / 2, h]), dash: true }],
+    text: (w, h) => [4, 2, w - 8, Math.min(40, h * 0.3) - 4], size: [120, 260] },
+  fragment: { name: 'Fragment (alt / loop)', outline: (w, h) => rectSegs(0, 0, w, h),
+    extras: (w, h) => { const t = Math.min(24, h * 0.25), tw = Math.min(80, w * 0.4); return [{ segs: lineSegs([0, t], [tw - 8, t], [tw, t - 8], [tw, 0]) }]; },
+    text: (w, h) => [4, 2, Math.min(80, w * 0.4) - 14, Math.min(24, h * 0.25) - 4], noGrow: true, size: [260, 160] },
+  initialState: { name: 'Initial state', solid: true, outline: (w, h) => ellSegs(w / 2, h / 2, w / 2, h / 2), text: below, noGrow: true, size: [30, 30] },
+  finalState: { name: 'Final state', outline: (w, h) => ellSegs(w / 2, h / 2, w / 2, h / 2),
+    extras: (w, h) => [{ segs: ellSegs(w / 2, h / 2, w * 0.3, h * 0.3), fill: 'stroke' }], text: below, noGrow: true, size: [34, 34] },
+};
+// Built-in shapes, only used to draw picker icons
+const BUILTIN_ICONS = {
+  rectangle: { outline: (w, h) => rectSegs(0, 0, w, h), size: [120, 80] },
+  diamond: { outline: (w, h) => polySegs([[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]]), size: [110, 90] },
+  ellipse: { outline: (w, h) => ellSegs(w / 2, h / 2, w / 2, h / 2), size: [120, 80] },
+};
+const SHAPE_MENU = [
+  ['Basic', ['rectangle', 'diamond', 'ellipse', 'triangle', 'rightTriangle', 'pentagon', 'hexagon', 'octagon', 'star', 'parallelogram', 'trapezoid', 'cross', 'blockArrow', 'heart', 'cloud', 'callout']],
+  ['Flowchart', ['terminator:Terminator (start / end)', 'rectangle:Process', 'diamond:Decision', 'parallelogram:Data (input / output)', 'predefined', 'document', 'manualInput', 'manualOperation',
+    'hexagon:Preparation', 'database', 'delay', 'display', 'internalStorage', 'offPage', 'merge', 'ellipse:Connector']],
+  ['UML', ['umlClass', 'actor', 'ellipse:Use case', 'component', 'package', 'note', 'node3d', 'lifeline', 'fragment', 'initialState', 'finalState', 'diamond:Decision / merge', 'rectangle:State']],
+];
+
+function translateSeg(s, ox, oy) {
+  switch (s[0]) {
+    case 'M': case 'L': return [s[0], s[1] + ox, s[2] + oy];
+    case 'Q': return ['Q', s[1] + ox, s[2] + oy, s[3] + ox, s[4] + oy];
+    case 'C': return ['C', s[1] + ox, s[2] + oy, s[3] + ox, s[4] + oy, s[5] + ox, s[6] + oy];
+    case 'A': return ['A', s[1] + ox, s[2] + oy, s[3], s[4], s[5], s[6]];
+    default: return s;
+  }
+}
+const arcPt = (cx, cy, rx, ry, deg) => [cx + rx * Math.cos((deg * Math.PI) / 180), cy + ry * Math.sin((deg * Math.PI) / 180)];
+// Sample path commands into polylines: [{ pts, closed }]
+function sampleSegs(segs) {
+  const subs = [];
+  let cur = null, c = [0, 0];
+  const ensure = () => { if (!cur) { cur = { pts: [c.slice()], closed: false }; subs.push(cur); } };
+  for (const s of segs) {
+    switch (s[0]) {
+      case 'M': cur = { pts: [[s[1], s[2]]], closed: false }; subs.push(cur); c = [s[1], s[2]]; break;
+      case 'L': ensure(); cur.pts.push([s[1], s[2]]); c = [s[1], s[2]]; break;
+      case 'Q': { ensure(); const [x0, y0] = c; for (let i = 1; i <= 12; i++) { const t = i / 12, u = 1 - t; cur.pts.push([u * u * x0 + 2 * u * t * s[1] + t * t * s[3], u * u * y0 + 2 * u * t * s[2] + t * t * s[4]]); } c = [s[3], s[4]]; break; }
+      case 'C': { ensure(); const [x0, y0] = c; for (let i = 1; i <= 16; i++) { const t = i / 16, u = 1 - t;
+          cur.pts.push([u * u * u * x0 + 3 * u * u * t * s[1] + 3 * u * t * t * s[3] + t * t * t * s[5], u * u * u * y0 + 3 * u * u * t * s[2] + 3 * u * t * t * s[4] + t * t * t * s[6]]); }
+        c = [s[5], s[6]]; break; }
+      case 'A': { ensure(); const [, cx, cy, rx, ry, a0, a1] = s, n = Math.max(4, Math.ceil(Math.abs(a1 - a0) / 10));
+        for (let i = 0; i <= n; i++) cur.pts.push(arcPt(cx, cy, rx, ry, a0 + ((a1 - a0) * i) / n));
+        c = cur.pts[cur.pts.length - 1].slice(); break; }
+      case 'Z': if (cur) { cur.closed = true; const f = cur.pts[0], l = cur.pts[cur.pts.length - 1]; if (cur.pts.length > 1 && Math.hypot(f[0] - l[0], f[1] - l[1]) < 0.01) cur.pts.pop(); c = cur.pts[0].slice(); } break;
+    }
+  }
+  return subs;
+}
+const fmt = (v) => +v.toFixed(2);
+function segsToD(segs) {
+  let d = '', c = [0, 0];
+  for (const s of segs) {
+    switch (s[0]) {
+      case 'M': case 'L': d += `${s[0]} ${fmt(s[1])} ${fmt(s[2])} `; c = [s[1], s[2]]; break;
+      case 'Q': d += `Q ${fmt(s[1])} ${fmt(s[2])} ${fmt(s[3])} ${fmt(s[4])} `; c = [s[3], s[4]]; break;
+      case 'C': d += `C ${s.slice(1).map(fmt).join(' ')} `; c = [s[5], s[6]]; break;
+      case 'A': {
+        const [, cx, cy, rx, ry, a0, a1] = s;
+        if (rx <= 0 || ry <= 0) break;
+        const st = arcPt(cx, cy, rx, ry, a0);
+        if (Math.hypot(st[0] - c[0], st[1] - c[1]) > 0.01) d += `L ${fmt(st[0])} ${fmt(st[1])} `;
+        const n = Math.max(1, Math.ceil(Math.abs(a1 - a0) / 120)), sweep = a1 > a0 ? 1 : 0;
+        for (let i = 1; i <= n; i++) { const p = arcPt(cx, cy, rx, ry, a0 + ((a1 - a0) * i) / n); d += `A ${fmt(rx)} ${fmt(ry)} 0 0 ${sweep} ${fmt(p[0])} ${fmt(p[1])} `; c = p; }
+        break;
+      }
+      case 'Z': d += 'Z '; break;
+    }
+  }
+  return d.trim();
+}
+// Geometry of a 'shape' element in coords relative to (el.x, el.y); cached per size
+function shapeGeom(el) {
+  const W = el.width, H = el.height, key = `${el.shape}|${W}|${H}`;
+  if (el._g && el._g.key === key) return el._g;
+  const def = SHAPES[el.shape] || SHAPES.triangle;
+  const ox = Math.min(0, W), oy = Math.min(0, H), w = Math.abs(W), h = Math.abs(H);
+  const T = (segs) => segs.map((s) => translateSeg(s, ox, oy));
+  const oseg = T(def.outline(w, h));
+  const extras = (def.extras ? def.extras(w, h) : []).map((x) => { const s = T(x.segs); return { ...x, segs: s, d: segsToD(s), subs: sampleSegs(s) }; });
+  const g = { key, def, d: segsToD(oseg), outline: (sampleSegs(oseg)[0] || { pts: [] }).pts, extras };
+  el._g = g;
+  return g;
+}
+function shapeIconSvg(kind) {
+  const def = SHAPES[kind] || BUILTIN_ICONS[kind];
+  if (!def) return '';
+  const [sw, sh] = def.size || [120, 80], s = Math.min(26 / sw, 20 / sh), w = sw * s, h = sh * s;
+  let body = def.noOutline ? '' : `<path d="${segsToD(def.outline(w, h))}"${def.solid ? ' fill="currentColor"' : ''}/>`;
+  for (const x of def.extras ? def.extras(w, h) : []) {
+    const fill = x.fill === 'stroke' ? ' fill="currentColor"' : x.fill === 'bg' ? ' fill="var(--ui-bg)"' : '';
+    body += `<path d="${segsToD(x.segs)}"${fill}${x.dash ? ' stroke-dasharray="3 2"' : ''}/>`;
+  }
+  return `<svg viewBox="-2 -2 ${fmt(w + 4)} ${fmt(h + 4)}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">${body}</svg>`;
+}
+// Text area of a container in local (unrotated) coords: [x, y, w, h]
+function textBoxLocal(c) {
+  const [x1, y1, x2, y2] = localBox(c), w = x2 - x1, h = y2 - y1;
+  if (c.type === 'shape') { const [tx, ty, tw, th] = (SHAPES[c.shape] || SHAPES.triangle).text(w, h); return [x1 + tx, y1 + ty, tw, th]; }
+  const k = containerK(c), tw = w * k, th = h * k;
+  return [x1 + (w - tw) / 2, y1 + (h - th) / 2, tw, th];
+}
+const isClosedLine = (el) => el.type === 'line' && el.points && el.points.length >= 4 &&
+  Math.hypot(el.points[0][0] - el.points[el.points.length - 1][0], el.points[0][1] - el.points[el.points.length - 1][1]) < 1;
+const propType = (el) => (isClosedLine(el) ? 'polygon' : el.type);
+const toolType = (t) => (t && t.startsWith('shape:') ? 'shape' : t);
+
+
 
 /* ============================================================
    State
@@ -368,13 +625,16 @@ const state = {
   style: {
     strokeColor: '#1e1e1e', backgroundColor: 'transparent', fillStyle: 'hachure', strokeWidth: 2,
     strokeStyle: 'solid', roughness: 1, roundness: 'round', opacity: 100, fontSize: 20, fontFamily: 1,
-    textAlign: 'left', startArrowhead: null, endArrowhead: 'arrow', arrowType: 'curved',
+    textAlign: 'left', startArrowhead: null, endArrowhead: 'arrow', arrowType: 'curved', penShapes: 'auto',
   },
   theme: 'light',
   grid: false,
   space: false,
   editor: null,
   bindHint: null,
+  smartGuides: true,
+  guideLines: [],
+  ctxPoint: null,
 };
 let action = null;
 let lastPointer = { x: 0, y: 0 };
@@ -477,6 +737,10 @@ function outlineLocal(el) {
   const [x1, y1, x2, y2] = localBox(el);
   if (el.type === 'ellipse') return { ellipse: [(x1 + x2) / 2, (y1 + y2) / 2, Math.max((x2 - x1) / 2, 0.5), Math.max((y2 - y1) / 2, 0.5)] };
   if (el.type === 'diamond') { const mx = (x1 + x2) / 2, my = (y1 + y2) / 2; return { poly: [[mx, y1], [x2, my], [mx, y2], [x1, my]] }; }
+  if (el.type === 'shape') {
+    const g = shapeGeom(el);
+    if (!g.def.noOutline && g.outline.length >= 3) return { poly: g.outline.map(([x, y]) => [el.x + x, el.y + y]) };
+  }
   return { poly: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]] };
 }
 function insideLocal(el, x, y, margin = 0) {
@@ -616,7 +880,7 @@ function syncArrow(a, map) {
 const ROUTE_PAD = 22;          // clearance kept around obstacles
 const BEND_COST = 60;          // penalty per turn (favours clean routes)
 const MAX_OBSTACLES = 60;
-const OBSTACLE_TYPES = ['rectangle', 'diamond', 'ellipse', 'image', 'text'];
+const OBSTACLE_TYPES = ['rectangle', 'diamond', 'ellipse', 'image', 'text', 'shape'];
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]]; // 0 right, 1 left, 2 down, 3 up
 const OPP = [1, 0, 3, 2];
 const dirOf = (dx, dy) => (Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 0 : 1) : (dy >= 0 ? 2 : 3));
@@ -796,7 +1060,7 @@ function polylineMid(wp) {
 const containerK = (c) => (c.type === 'ellipse' ? Math.SQRT1_2 : c.type === 'diamond' ? 0.5 : 1);
 function boundMaxWidth(c) {
   if (isLinear(c)) return LABEL_MAX_W;
-  return Math.max(Math.abs(c.width) * containerK(c) - BOUND_PAD * 2, 12);
+  return Math.max(textBoxLocal(c)[2] - BOUND_PAD * 2, 12);
 }
 function labelPoint(el) {
   const wp = worldPoints(el), n = wp.length;
@@ -819,14 +1083,32 @@ function layoutBoundText(t, c) {
     t.x = px - t.width / 2; t.y = py - t.height / 2; t.angle = 0;
     return;
   }
-  const needH = (t.height + BOUND_PAD * 2) / containerK(c);
-  if (Math.abs(c.height) < needH - 0.5) {
-    const c0 = center(c);
-    c.height = Math.sign(c.height || 1) * needH;
-    fixRotation(c, c0);
-    bump(c);
+  const def = c.type === 'shape' ? SHAPES[c.shape] || SHAPES.triangle : null;
+  if (!def || !def.noGrow) {
+    const need = t.height + BOUND_PAD * 2, W = Math.abs(c.width);
+    const avail = (h) => (def ? def.text(W, h)[3] : h * containerK(c));
+    let h = Math.abs(c.height);
+    for (let i = 0; i < 10; i++) {
+      const a = avail(h);
+      if (a >= need - 0.5) break;
+      const slope = (avail(h + 10) - a) / 10;
+      if (slope < 0.02) break;
+      h += (need - a) / slope;
+    }
+    if (avail(h) >= need - 0.5) { // trim any overshoot to the smallest height that fits
+      let lo = Math.abs(c.height), hi = h;
+      for (let i = 0; i < 24 && hi - lo > 0.25; i++) { const m = (lo + hi) / 2; if (avail(m) >= need - 0.5) hi = m; else lo = m; }
+      h = hi;
+    }
+    if (h > Math.abs(c.height) + 0.01) {
+      const c0 = center(c);
+      c.height = Math.sign(c.height || 1) * h;
+      fixRotation(c, c0);
+      bump(c);
+    }
   }
-  const [cx, cy] = center(c);
+  const tb = textBoxLocal(c);
+  const [cx, cy] = fromLocal(c, tb[0] + tb[2] / 2, tb[1] + tb[3] / 2);
   t.x = cx - t.width / 2; t.y = cy - t.height / 2; t.angle = c.angle || 0;
 }
 // Recompute everything derived from other elements: bound text layout, arrow endpoints, labels.
@@ -957,11 +1239,23 @@ function buildShape(el) {
     case 'line':
     case 'arrow': {
       const pts = el.points.map((p) => [p[0], p[1]]);
+      if (isClosedLine(el)) return [gen.polygon(pts.slice(0, -1), o)];
       const lo = roughOpts(el, false);
       const out = [pts.length > 2 && el.roundness && !el.elbowed ? gen.curve(pts, lo) : gen.linearPath(pts, lo)];
       if (el.type === 'arrow') {
         if (el.startArrowhead) out.push(...arrowHead(el, pts, true));
         if (el.endArrowhead) out.push(...arrowHead(el, pts, false));
+      }
+      return out;
+    }
+    case 'shape': {
+      const g = shapeGeom(el), out = [];
+      if (!g.def.noOutline) out.push(gen.path(g.d, g.def.solid ? { ...o, fill: el.strokeColor, fillStyle: 'solid' } : o));
+      for (const ex of g.extras) {
+        const eo = roughOpts(el, false);
+        if (ex.dash) { eo.strokeLineDash = [8, 8 + el.strokeWidth]; eo.disableMultiStroke = true; }
+        if (ex.fill) { eo.fill = ex.fill === 'stroke' ? el.strokeColor : el.backgroundColor !== 'transparent' ? el.backgroundColor : '#ffffff'; eo.fillStyle = 'solid'; }
+        out.push(gen.path(ex.d, eo));
       }
       return out;
     }
@@ -1200,6 +1494,7 @@ function render() {
   const a = toWorld(0, 0), b = toWorld(innerWidth, innerHeight), m = 60 / z;
   drawScene(ctx, rc, state.elements, { zoom: z, view: [a.x - m, a.y - m, b.x + m, b.y + m] });
   drawBindHint();
+  drawGuides();
   drawSelection();
   if (action && action.type === 'box') {
     const { start: s, cur: c } = action;
@@ -1233,7 +1528,7 @@ function hitTest(el, p, tol, allowInsideSelected = true) {
   const [x, y] = toLocal(el, p.x, p.y);
   const lx = x - el.x, ly = y - el.y;
   const t = tol + el.strokeWidth / 2;
-  const filled = el.backgroundColor && el.backgroundColor !== 'transparent';
+  const filled = (el.backgroundColor && el.backgroundColor !== 'transparent') || (el.type === 'shape' && SHAPES[el.shape]?.solid);
   const inside = filled || (allowInsideSelected && state.selected.has(el.id));
   const W = el.width, H = el.height, bx = Math.min(0, W), by = Math.min(0, H), w = Math.abs(W), h = Math.abs(H);
   switch (el.type) {
@@ -1250,7 +1545,14 @@ function hitTest(el, p, tol, allowInsideSelected = true) {
       const d = Math.sqrt(((lx - cx) / rx) ** 2 + ((ly - cy) / ry) ** 2);
       return (inside && d <= 1) || Math.abs(d - 1) * Math.min(rx, ry) <= t;
     }
+    case 'shape': {
+      const g = shapeGeom(el);
+      if (g.def.noOutline) return lx >= bx - tol && ly >= by - tol && lx <= bx + w + tol && ly <= by + h + tol;
+      if ((inside && inPoly(lx, ly, g.outline)) || distPoly(lx, ly, g.outline, true) <= t) return true;
+      return g.extras.some((ex) => ex.subs.some((sp) => sp.pts.length > 1 && distPoly(lx, ly, sp.pts, sp.closed) <= t));
+    }
     case 'line': case 'arrow': case 'freedraw': {
+      if (isClosedLine(el) && inside && inPoly(lx, ly, el.points)) return true;
       if (el.points.length === 1) return Math.hypot(lx - el.points[0][0], ly - el.points[0][1]) <= t + 2;
       if (allowInsideSelected && state.selected.has(el.id) && el.type === 'freedraw') {
         const [x1, y1, x2, y2] = localBox(el);
@@ -1457,7 +1759,7 @@ function updateCreate(a, p, e) {
     bump(el);
     return;
   }
-  p = snapPt(p);
+  p = state.grid ? snapPt(p) : snapPointToGuides(p, a.targets, e);
   if (isLinear(el)) {
     let dx = p.x - el.x, dy = p.y - el.y;
     if (e.shiftKey) {
@@ -1494,6 +1796,259 @@ function deleteElements(ids) {
 }
 
 /* ============================================================
+   Pen tool → shape recognition
+   ============================================================ */
+const d2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function pathLength(pts) { let l = 0; for (let i = 1; i < pts.length; i++) l += d2(pts[i - 1], pts[i]); return l; }
+function resamplePath(pts, n) {
+  const L = pathLength(pts);
+  if (!L || pts.length < 2) return pts.map((p) => [p[0], p[1]]);
+  const step = L / (n - 1), out = [[pts[0][0], pts[0][1]]];
+  let acc = 0, prev = [pts[0][0], pts[0][1]];
+  for (let i = 1; i < pts.length; i++) {
+    const cur = [pts[i][0], pts[i][1]];
+    let d = d2(prev, cur);
+    while (acc + d >= step && d > 0 && out.length < n) {
+      const t = (step - acc) / d, q = [prev[0] + (cur[0] - prev[0]) * t, prev[1] + (cur[1] - prev[1]) * t];
+      out.push(q); prev = q; d = d2(prev, cur); acc = 0;
+    }
+    acc += d; prev = cur;
+  }
+  while (out.length < n) out.push([pts[pts.length - 1][0], pts[pts.length - 1][1]]);
+  return out;
+}
+function convexHull(pts) {
+  const p = pts.map((q) => [q[0], q[1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  lo.pop(); up.pop();
+  return lo.concat(up);
+}
+const polyArea = (pts) => { let a = 0; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]); return Math.abs(a / 2); };
+const perimeter = (pts) => pathLength(pts) + (pts.length > 1 ? d2(pts[0], pts[pts.length - 1]) : 0);
+function minAreaRect(h) {
+  let best = null;
+  for (let i = 0; i < h.length; i++) {
+    const a = h[i], b = h[(i + 1) % h.length], th = Math.atan2(b[1] - a[1], b[0] - a[0]), c = Math.cos(-th), s = Math.sin(-th);
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const [x, y] of h) { const rx = x * c - y * s, ry = x * s + y * c; x1 = Math.min(x1, rx); y1 = Math.min(y1, ry); x2 = Math.max(x2, rx); y2 = Math.max(y2, ry); }
+    const area = (x2 - x1) * (y2 - y1);
+    if (!best || area < best.area) {
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, cc = Math.cos(th), ss = Math.sin(th);
+      best = { area, w: x2 - x1, h: y2 - y1, angle: th, cx: mx * cc - my * ss, cy: mx * ss + my * cc };
+    }
+  }
+  let { angle, w, h: hh } = best;
+  while (angle > Math.PI / 4) { angle -= Math.PI / 2; [w, hh] = [hh, w]; }
+  while (angle <= -Math.PI / 4) { angle += Math.PI / 2; [w, hh] = [hh, w]; }
+  return { ...best, angle, w, h: hh };
+}
+function rdp(pts, eps) {
+  if (pts.length < 3) return pts.slice();
+  const a = pts[0], b = pts[pts.length - 1];
+  let idx = -1, md = -1;
+  for (let i = 1; i < pts.length - 1; i++) { const d = distSeg(pts[i][0], pts[i][1], a[0], a[1], b[0], b[1]); if (d > md) { md = d; idx = i; } }
+  if (md <= eps) return [a, b];
+  return rdp(pts.slice(0, idx + 1), eps).slice(0, -1).concat(rdp(pts.slice(idx), eps));
+}
+function rdpClosed(pts, eps) {
+  let far = 0, fd = -1;
+  pts.forEach((p, i) => { const d = d2(pts[0], p); if (d > fd) { fd = d; far = i; } });
+  let out = rdp(pts.slice(0, far + 1), eps).slice(0, -1).concat(rdp(pts.slice(far).concat([pts[0]]), eps).slice(0, -1));
+  // drop near-collinear vertices (RDP can leave one at the split points)
+  for (let changed = true; changed && out.length > 3;) {
+    changed = false;
+    for (let i = 0; i < out.length; i++) {
+      const a = out[(i - 1 + out.length) % out.length], b = out[(i + 1) % out.length];
+      if (distSeg(out[i][0], out[i][1], a[0], a[1], b[0], b[1]) <= eps * 0.8) { out.splice(i, 1); changed = true; break; }
+    }
+  }
+  return out;
+}
+// Average bulge of the hull between consecutive corners (≈0 for straight edges, ≈0.1 for arcs)
+function edgeCurvature(H, corners) {
+  const idx = corners.map((c) => H.indexOf(c)).filter((i) => i >= 0).sort((a, b) => a - b);
+  if (idx.length < 3) return 1;
+  let sum = 0;
+  for (let k = 0; k < idx.length; k++) {
+    const i0 = idx[k], i1 = idx[(k + 1) % idx.length], a = H[i0], b = H[i1], len = d2(a, b) || 1;
+    let md = 0;
+    for (let i = (i0 + 1) % H.length; i !== i1; i = (i + 1) % H.length) md = Math.max(md, distSeg(H[i][0], H[i][1], a[0], a[1], b[0], b[1]));
+    sum += md / len;
+  }
+  return sum / idx.length;
+}
+const snapAngle = (a) => (Math.abs(a) < (10 * Math.PI) / 180 ? 0 : a);
+// Returns a description of the recognised shape, or null to keep the freehand stroke
+function recognizeStroke(raw, zoom = 1) {
+  if (!raw || raw.length < 6) return null;
+  const pts = resamplePath(raw, 64);
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys), diag = Math.hypot(bw, bh);
+  if (diag < 16 / zoom) return null;
+  const L = pathLength(pts), gap = d2(pts[0], pts[pts.length - 1]);
+  const closed = gap < Math.max(0.22 * diag, 12 / zoom) && L > 1.6 * diag;
+  if (!closed) {
+    const a = pts[0], b = pts[pts.length - 1], chord = gap;
+    let dev = 0;
+    for (const p of pts) dev = Math.max(dev, distSeg(p[0], p[1], a[0], a[1], b[0], b[1]));
+    if (chord > 12 / zoom && dev <= Math.max(0.06 * chord, 3 / zoom) && L < chord * 1.15) return { kind: 'line', label: 'line', from: a, to: b };
+    // arrow drawn in one stroke: a straight shaft, then a short head near the tip
+    const r = rdp(pts, Math.max(0.045 * diag, 3 / zoom));
+    if (r.length >= 3 && r.length <= 5) {
+      const s0 = r[0], tip = r[1], l1 = d2(s0, tip), ux = (tip[0] - s0[0]) / l1, uy = (tip[1] - s0[1]) / l1;
+      const head = r.slice(2);
+      const behind = (p) => d2(p, tip) < 0.5 * l1 && d2(p, tip) > 0.04 * l1 && ((p[0] - tip[0]) * ux + (p[1] - tip[1]) * uy) < 0;
+      const ok = l1 >= 0.5 * pathLength(r) && head.some(behind) && head.every((p) => behind(p) || d2(p, tip) < 0.08 * l1);
+      const shaftDev = Math.max(...pts.slice(0, Math.max(2, Math.round((pts.length * l1) / L))).map((p) => distSeg(p[0], p[1], s0[0], s0[1], tip[0], tip[1])));
+      if (ok && shaftDev < Math.max(0.1 * l1, 4 / zoom)) return { kind: 'arrow', label: 'arrow', from: s0, to: tip };
+    }
+    return null;
+  }
+  if (L > 3.4 * perimeter(convexHull(pts))) return null; // scribble
+  const H = convexHull(pts), A = polyArea(H);
+  if (A < (10 / zoom) ** 2) return null;
+  if (polyArea(pts) / A < 0.78) return null; // concave (star, letters…)
+  const P = perimeter(H), mr = minAreaRect(H), fill = A / mr.area;
+  const corners = rdpClosed(H, Math.max(0.04 * P, 2 / zoom)), nC = corners.length, cornerFit = polyArea(corners) / A;
+  const curvy = edgeCurvature(H, corners);
+  const bx = Math.min(...xs), by = Math.min(...ys);
+  const box = { cx: bx + bw / 2, cy: by + bh / 2, w: bw, h: bh };
+  if (nC === 3 && cornerFit > 0.85) return { kind: 'polygon', label: 'triangle', points: corners };
+  if (nC === 4 && cornerFit > 0.85) {
+    const mids = [[box.cx, by], [bx + bw, box.cy], [box.cx, by + bh], [bx, box.cy]];
+    if (corners.every((c) => mids.some((m) => d2(c, m) < 0.14 * diag))) return { kind: 'diamond', label: 'diamond', ...box, angle: 0 };
+  }
+  if (fill >= 0.86) {
+    const ang = snapAngle(mr.angle);
+    return ang ? { kind: 'rectangle', label: 'rectangle', cx: mr.cx, cy: mr.cy, w: mr.w, h: mr.h, angle: ang } : { kind: 'rectangle', label: 'rectangle', ...box, angle: 0 };
+  }
+  if (nC === 4 && cornerFit > 0.88) return { kind: 'polygon', label: 'shape', points: corners };
+  if (nC >= 5 && nC <= 8 && cornerFit > 0.88 && curvy < 0.075) return { kind: 'polygon', label: nC === 5 ? 'pentagon' : nC === 6 ? 'hexagon' : 'polygon', points: corners };
+  if (fill >= 0.66 && (cornerFit < 0.88 || curvy >= 0.075)) {
+    let { w, h, angle } = mr;
+    angle = snapAngle(angle);
+    if (!angle) ({ w, h } = box);
+    if (Math.min(w, h) / Math.max(w, h) > 0.88) { const m = (w + h) / 2; w = h = m; angle = 0; }
+    return { kind: 'ellipse', label: w === h ? 'circle' : 'ellipse', cx: angle ? mr.cx : box.cx, cy: angle ? mr.cy : box.cy, w, h, angle };
+  }
+  if (nC >= 5 && nC <= 8 && cornerFit > 0.92) return { kind: 'polygon', label: 'polygon', points: corners };
+  return null;
+}
+function elementFromRecognition(rec, src) {
+  let el;
+  if (rec.kind === 'rectangle' || rec.kind === 'ellipse' || rec.kind === 'diamond') {
+    el = createElement(rec.kind, { x: rec.cx - rec.w / 2, y: rec.cy - rec.h / 2 });
+    el.width = rec.w; el.height = rec.h; el.angle = rec.angle || 0;
+  } else if (rec.kind === 'polygon') {
+    const p0 = rec.points[0];
+    el = createElement('line', { x: p0[0], y: p0[1] });
+    el.points = [...rec.points, p0].map((p) => [p[0] - p0[0], p[1] - p0[1]]);
+    el.roundness = null;
+  } else {
+    el = createElement(rec.kind, { x: rec.from[0], y: rec.from[1] });
+    el.points = [[0, 0], [rec.to[0] - rec.from[0], rec.to[1] - rec.from[1]]];
+    if (rec.kind === 'arrow') {
+      if (!el.endArrowhead) el.endArrowhead = 'arrow';
+      const t1 = findBindTarget({ x: rec.from[0], y: rec.from[1] }), t2 = findBindTarget({ x: rec.to[0], y: rec.to[1] });
+      if (t1) el.startBinding = makeBinding(t1, { x: rec.from[0], y: rec.from[1] });
+      if (t2 && t2 !== t1) el.endBinding = makeBinding(t2, { x: rec.to[0], y: rec.to[1] });
+    }
+  }
+  Object.assign(el, { strokeColor: src.strokeColor, strokeWidth: src.strokeWidth, opacity: src.opacity, groupIds: [...(src.groupIds || [])], frameId: src.frameId || null });
+  normalize(el);
+  return el;
+}
+// Replace a freehand stroke with the recognised shape (in place). Returns { el, rec } or null.
+function convertFreedraw(el) {
+  if (!el || el.type !== 'freedraw') return null;
+  const rec = recognizeStroke(worldPoints(el), state.view.zoom);
+  if (!rec) return null;
+  const i = state.elements.indexOf(el);
+  if (i < 0) return null;
+  const nel = elementFromRecognition(rec, el);
+  state.elements.splice(i, 1, nel);
+  return { el: nel, rec };
+}
+function armHold(a, p) {
+  if (a.holdAt && d2([p.x, p.y], a.holdAt) < 4 / state.view.zoom) return;
+  a.holdAt = [p.x, p.y];
+  clearTimeout(a.holdTimer);
+  a.holdTimer = setTimeout(() => {
+    if (action !== a || a.snapped) return;
+    const r = convertFreedraw(a.el);
+    if (r) { a.snapped = r; requestRender(); }
+  }, 550);
+}
+
+/* ============================================================
+   Smart guides: alignment lines + snapping to other shapes
+   ============================================================ */
+const SNAP_PX = 7;
+function guideTargets(exclude) {
+  const a = toWorld(0, 0), b = toWorld(innerWidth, innerHeight), out = [];
+  for (const el of state.elements) {
+    if (exclude.has(el.id) || el.containerId || el._editing || isLinear(el)) continue;
+    const bb = el.type === 'frame' ? localBox(el) : getBounds(el);
+    if (bb[2] < a.x || bb[0] > b.x || bb[3] < a.y || bb[1] > b.y) continue;
+    out.push(bb);
+  }
+  return out;
+}
+const xsOf = (b) => [b[0], (b[0] + b[2]) / 2, b[2]];
+const ysOf = (b) => [b[1], (b[1] + b[3]) / 2, b[3]];
+function snapOffsets(mx, my, targets, thr) {
+  let dx = null, dy = null;
+  for (const t of targets) {
+    for (const v of xsOf(t)) for (const m of mx) { const d = v - m; if (Math.abs(d) <= thr && (dx === null || Math.abs(d) < Math.abs(dx))) dx = d; }
+    for (const v of ysOf(t)) for (const m of my) { const d = v - m; if (Math.abs(d) <= thr && (dy === null || Math.abs(d) < Math.abs(dy))) dy = d; }
+  }
+  return [dx, dy];
+}
+function buildGuides(mx, my, span, targets) {
+  const vx = new Map(), hy = new Map();
+  const add = (map, key, a, b) => { const k = Math.round(key * 100) / 100, cur = map.get(k); map.set(k, cur ? [Math.min(cur[0], a), Math.max(cur[1], b)] : [a, b]); };
+  for (const t of targets) {
+    for (const v of xsOf(t)) if (mx.some((m) => Math.abs(m - v) < 0.5)) add(vx, v, Math.min(t[1], span[1]), Math.max(t[3], span[3]));
+    for (const v of ysOf(t)) if (my.some((m) => Math.abs(m - v) < 0.5)) add(hy, v, Math.min(t[0], span[0]), Math.max(t[2], span[2]));
+  }
+  return [...[...vx].map(([x, [a, b]]) => [x, a, x, b]), ...[...hy].map(([y, [a, b]]) => [a, y, b, y])];
+}
+const guidesActive = (e) => state.smartGuides && !state.grid && !(e && (e.ctrlKey || e.metaKey));
+function snapPointToGuides(p, targets, e) {
+  if (!targets || !guidesActive(e)) { state.guideLines = []; return p; }
+  const [dx, dy] = snapOffsets([p.x], [p.y], targets, SNAP_PX / state.view.zoom);
+  const q = { x: p.x + (dx ?? 0), y: p.y + (dy ?? 0) };
+  state.guideLines = buildGuides(dx !== null ? [q.x] : [], dy !== null ? [q.y] : [], [q.x, q.y, q.x, q.y], targets);
+  return q;
+}
+function snapMove(a, dx, dy, lockX, lockY, e) {
+  if (!a.bbox || !guidesActive(e)) { state.guideLines = []; return [dx, dy]; }
+  const b = a.bbox, mb = [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy];
+  const [sx, sy] = snapOffsets(xsOf(mb), ysOf(mb), a.targets, SNAP_PX / state.view.zoom);
+  if (sx !== null && !lockX) dx += sx;
+  if (sy !== null && !lockY) dy += sy;
+  const fb = [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy];
+  state.guideLines = buildGuides(xsOf(fb), ysOf(fb), fb, a.targets);
+  return [dx, dy];
+}
+function drawGuides() {
+  if (!action || !state.guideLines.length) return;
+  const z = state.view.zoom, s = 3 / z;
+  ctx.save();
+  ctx.strokeStyle = '#fa5252'; ctx.lineWidth = 1 / z;
+  for (const [x1, y1, x2, y2] of state.guideLines) {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    for (const [x, y] of [[x1, y1], [x2, y2]]) { ctx.moveTo(x - s, y - s); ctx.lineTo(x + s, y + s); ctx.moveTo(x + s, y - s); ctx.lineTo(x - s, y + s); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ============================================================
    History & persistence
    ============================================================ */
 const history = { stack: [], index: -1 };
@@ -1517,7 +2072,7 @@ function restoreHistory() {
 }
 function undo() { if (history.index > 0) { history.index--; restoreHistory(); } }
 function redo() { if (history.index < history.stack.length - 1) { history.index++; restoreHistory(); } }
-const sceneState = () => ({ elements: JSON.parse(snapshot()), style: state.style, view: state.view, theme: state.theme, grid: state.grid });
+const sceneState = () => ({ elements: JSON.parse(snapshot()), style: state.style, view: state.view, theme: state.theme, grid: state.grid, smartGuides: state.smartGuides });
 let persistTimer = 0;
 function persist() {
   clearTimeout(persistTimer);
@@ -1534,6 +2089,7 @@ function loadLocal() {
     Object.assign(state.style, d.style || {});
     if (d.view) state.view = d.view;
     state.grid = !!d.grid;
+    state.smartGuides = d.smartGuides ?? true;
     setTheme(d.theme || 'light');
   } catch (err) { console.warn(err); }
 }
@@ -1612,10 +2168,29 @@ function toExcalidraw(el, bm) {
   if (el.type === 'freedraw') { o.pressures = el.simulatePressure ? [] : el.pressures; o.simulatePressure = !!el.simulatePressure; }
   if (el.type === 'text') Object.assign(o, { originalText: el.originalText ?? el.text, containerId: el.containerId || null, lineHeight: LINE_H, verticalAlign: el.containerId ? 'middle' : 'top', autoResize: true });
   if (el.type === 'image') Object.assign(o, { status: 'saved', scale: [1, 1] });
+  if (el.type === 'line') o.polygon = isClosedLine(el);
+  if (el.type === 'text' && el.fontFamily > 100) { o.fontFamily = 1; o.customData = { ...(o.customData || {}), sbFont: el.fontFamily }; }
+  if (el.type === 'shape') {
+    // Excalidraw has no such shape: export the outline as a closed polygon line and keep the details in customData
+    const g = shapeGeom(el);
+    const poly = g.def.noOutline || g.outline.length < 3 ? [[0, 0], [el.width, 0], [el.width, el.height], [0, el.height]] : g.outline;
+    const pts = [...poly, poly[0]], [px, py] = pts[0];
+    const lp = pts.map((q) => [q[0] - px, q[1] - py]), xs = lp.map((q) => q[0]), ys = lp.map((q) => q[1]);
+    delete o.shape;
+    Object.assign(o, { type: 'line', x: el.x + px, y: el.y + py, points: lp, width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys),
+      roundness: null, polygon: true, startArrowhead: null, endArrowhead: null, startBinding: null, endBinding: null, lastCommittedPoint: null,
+      customData: { ...(o.customData || {}), sbShape: el.shape, ox: px, oy: py, w: el.width, h: el.height, lw: Math.max(...xs) - Math.min(...xs) || 1, lh: Math.max(...ys) - Math.min(...ys) || 1 } });
+  }
   return o;
 }
 function fromExcalidraw(e) {
-  if (!e || e.isDeleted || !ELEMENT_TYPES.includes(e.type)) return null;
+  if (!e || e.isDeleted) return null;
+  const cd = e.customData || {};
+  if (e.type === 'line' && cd.sbShape && SHAPES[cd.sbShape]) {
+    const sx = cd.lw ? (+e.width || cd.lw) / cd.lw : 1, sy = cd.lh ? (+e.height || cd.lh) / cd.lh : 1;
+    e = { ...e, type: 'shape', shape: cd.sbShape, x: e.x - (cd.ox || 0) * sx, y: e.y - (cd.oy || 0) * sy, width: (cd.w || e.width) * sx, height: (cd.h || e.height) * sy, points: undefined };
+  }
+  if (!ELEMENT_TYPES.includes(e.type)) return null;
   const type = e.type === 'magicframe' ? 'frame' : e.type;
   const el = {
     id: e.id || uid(), type, x: +e.x || 0, y: +e.y || 0, width: +e.width || 0, height: +e.height || 0, angle: +e.angle || 0,
@@ -1640,13 +2215,16 @@ function fromExcalidraw(e) {
   }
   if (type === 'text') {
     const famMap = { 1: 1, 2: 2, 3: 3, 5: 1, 6: 2, 7: 2, 8: 3 };
-    Object.assign(el, { fontSize: e.fontSize || 20, fontFamily: famMap[e.fontFamily] || 1, textAlign: e.textAlign || 'left', containerId: e.containerId || null });
+    const fam = cd.sbFont && FONTS[cd.sbFont] ? cd.sbFont : e.fontFamily > 100 && FONTS[e.fontFamily] ? e.fontFamily : famMap[e.fontFamily] || 1;
+    Object.assign(el, { fontSize: e.fontSize || 20, fontFamily: fam, textAlign: e.textAlign || 'left', containerId: e.containerId || null });
     el.text = e.text ?? e.originalText ?? '';
     el.originalText = el.containerId ? e.originalText ?? e.text ?? '' : el.text;
     measureText(el);
   }
   if (type === 'image') el.fileId = e.fileId || null;
   if (type === 'frame') el.name = e.name || 'Frame';
+  if (type === 'shape') el.shape = SHAPES[e.shape] ? e.shape : 'triangle';
+  if (e.customData) el.customData = e.customData;
   return el;
 }
 // Convert + re-link (bound text, bindings, frames)
@@ -1730,7 +2308,7 @@ function renderExportSvg({ background = true, dark = false, onlySelected = false
   const svg = mk('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
   if (dark) svg.setAttribute('style', 'filter: invert(93%) hue-rotate(180deg)');
   const defs = mk('defs'), style = mk('style');
-  style.textContent = "@font-face{font-family:Virgil;src:url(https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw-assets/Virgil.woff2);}";
+  style.textContent = `@import url('${GF_URL}');@font-face{font-family:Virgil;src:url(https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw-assets/Virgil.woff2);}`;
   defs.appendChild(style); svg.appendChild(defs);
   if (background) svg.appendChild(mk('rect', { width: W, height: H, fill: '#ffffff' }));
   const rsvg = rough.svg(svg), map = new Map(els.map((e) => [e.id, e]));
@@ -2076,7 +2654,7 @@ function setTool(tool, keepSelection = false) {
   if (state.editor && tool !== state.tool) state.editor.ta.blur();
   state.tool = tool;
   if (tool !== 'selection' && !keepSelection) state.selected.clear();
-  document.querySelectorAll('#toolbar .tool[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
+  document.querySelectorAll('#toolbar .tool[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === tool || (b.dataset.tool === 'shapes' && tool.startsWith('shape:'))));
   setCursor(tool === 'hand' ? 'grab' : tool === 'selection' ? 'default' : tool === 'text' ? 'text' : 'crosshair');
   renderProps(); requestRender();
 }
@@ -2108,14 +2686,125 @@ function ungroup() {
   commit(); renderProps(); requestRender();
 }
 function reorder(kind) {
-  const isSel = (e) => state.selected.has(e.id);
-  let els = [...state.elements];
-  if (kind === 'front') els = [...els.filter((e) => !isSel(e)), ...els.filter(isSel)];
-  else if (kind === 'back') els = [...els.filter(isSel), ...els.filter((e) => !isSel(e))];
-  else if (kind === 'forward') { for (let i = els.length - 2; i >= 0; i--) if (isSel(els[i]) && !isSel(els[i + 1])) [els[i], els[i + 1]] = [els[i + 1], els[i]]; }
-  else if (kind === 'backward') { for (let i = 1; i < els.length; i++) if (isSel(els[i]) && !isSel(els[i - 1])) [els[i], els[i - 1]] = [els[i - 1], els[i]]; }
-  state.elements = els;
+  const els = state.elements, ids = new Set(els.map((e) => e.id));
+  const textOf = new Map();
+  for (const e of els) if (e.containerId && ids.has(e.containerId)) textOf.set(e.containerId, e);
+  const all = [];
+  for (const e of els) {
+    if (e.containerId && ids.has(e.containerId)) continue;
+    all.push(textOf.has(e.id) ? [e, textOf.get(e.id)] : [e]);
+  }
+  const isSel = (u) => state.selected.has(u[0].id);
+  if (!all.some(isSel)) return;
+  const bb = (u) => getBounds(u[0]);
+  const overlap = (a, b) => !(a[2] < b[0] || b[2] < a[0] || a[3] < b[1] || b[3] < a[1]);
+  const before = all.map((u) => u[0].id).join();
+  let out = all;
+  if (kind === 'front') out = [...all.filter((u) => !isSel(u)), ...all.filter(isSel)];
+  else if (kind === 'back') out = [...all.filter(isSel), ...all.filter((u) => !isSel(u))];
+  else if (kind === 'forward') {
+    for (let i = out.length - 1; i >= 0; i--) {
+      if (!isSel(out[i])) continue;
+      const b = bb(out[i]);
+      let j = i + 1;
+      while (j < out.length && (isSel(out[j]) || !overlap(b, bb(out[j])))) j++;
+      if (j >= out.length) { j = i + 1; while (j < out.length && isSel(out[j])) j++; if (j >= out.length) continue; }
+      const [u] = out.splice(i, 1); out.splice(j, 0, u);
+    }
+  } else if (kind === 'backward') {
+    for (let i = 0; i < out.length; i++) {
+      if (!isSel(out[i])) continue;
+      const b = bb(out[i]);
+      let j = i - 1;
+      while (j >= 0 && (isSel(out[j]) || !overlap(b, bb(out[j])))) j--;
+      if (j < 0) { j = i - 1; while (j >= 0 && isSel(out[j])) j--; if (j < 0) continue; }
+      const [u] = out.splice(i, 1); out.splice(j, 0, u);
+    }
+  }
+  if (out.map((u) => u[0].id).join() === before) {
+    toast(kind === 'front' || kind === 'forward' ? 'Already at the front' : 'Already at the back');
+    return;
+  }
+  state.elements = out.flat();
   commit(); requestRender();
+}
+function changeFontSize(f) {
+  const ts = propTargets().filter((e) => e.type === 'text');
+  if (!ts.length) return;
+  for (const t of ts) { t.fontSize = Math.max(4, Math.min(400, Math.round(f > 1 ? Math.max(t.fontSize * f, t.fontSize + 1) : Math.min(t.fontSize * f, t.fontSize - 1)))); if (!t.containerId) measureText(t); bump(t); }
+  state.style.fontSize = ts[0].fontSize;
+  commit(); renderProps(); requestRender();
+}
+function convertSelectedStrokes() {
+  const strokes = selectedEls().filter((e) => e.type === 'freedraw');
+  const made = [];
+  for (const el of strokes) { const r = convertFreedraw(el); if (r) made.push(r.el); }
+  if (!made.length) { toast("Couldn't recognise a shape in that drawing"); return; }
+  state.selected = new Set(made.map((e) => e.id));
+  updateFrameMembership(made);
+  commit(); renderProps(); requestRender();
+  toast(`Converted ${made.length} stroke${made.length > 1 ? 's' : ''} to shapes`);
+}
+function updateMenuStates() { const g = $('#guidesState'); if (g) g.textContent = state.smartGuides ? 'On' : 'Off'; }
+
+/* ---------- Shape picker ---------- */
+function buildShapePicker() {
+  $('#shapePicker').innerHTML = SHAPE_MENU.map(([cat, items]) => `<div class="sp-cat">${cat}</div><div class="sp-grid">${items.map((spec) => {
+    const [kind, title] = spec.split(':');
+    const name = title || SHAPES[kind]?.name || kind[0].toUpperCase() + kind.slice(1);
+    return `<button class="sp-item" data-shape="${kind}" title="${name}">${shapeIconSvg(kind)}</button>`;
+  }).join('')}</div>`).join('');
+}
+function toggleShapePicker(force) {
+  const open = $('#shapePicker').classList.toggle('open', force);
+  if (open) $('#ctxMenu').classList.remove('open');
+}
+function pickShape(kind) {
+  toggleShapePicker(false);
+  if (SHAPES[kind]) {
+    state.lastShape = kind;
+    const b = $('#toolbar [data-tool="shapes"]');
+    if (b) b.innerHTML = shapeIconSvg(kind) + '<span class="key">S</span>';
+    setTool('shape:' + kind);
+  } else setTool(kind);
+}
+
+/* ---------- Context menu ---------- */
+function openContextMenu(cx, cy) {
+  const sel = state.selected.size > 0;
+  const grouped = selectedEls().some((e) => e.groupIds && e.groupIds.length);
+  const hasStroke = selectedEls().some((e) => e.type === 'freedraw');
+  const it = (label, icon, act, sc = '') => `<button class="menu-item" data-action="${act}"><i data-lucide="${icon}"></i>${label}<span class="sc">${sc}</span></button>`;
+  const sep = '<div class="menu-sep"></div>';
+  const html = sel
+    ? it('Cut', 'scissors', 'cut', 'Ctrl+X') + it('Copy', 'copy', 'copy', 'Ctrl+C') + it('Paste', 'clipboard-paste', 'paste', 'Ctrl+V') + sep +
+      it('Bring to front', 'arrow-up-to-line', 'toFront', 'Ctrl+Shift+]') + it('Bring forward', 'arrow-up', 'forward', 'Ctrl+]') +
+      it('Send backward', 'arrow-down', 'backward', 'Ctrl+[') + it('Send to back', 'arrow-down-to-line', 'toBack', 'Ctrl+Shift+[') + sep +
+      it('Duplicate', 'copy-plus', 'duplicate', 'Ctrl+D') +
+      (state.selected.size > 1 ? it('Group', 'group', 'group', 'Ctrl+G') : '') + (grouped ? it('Ungroup', 'ungroup', 'ungroup', 'Ctrl+Shift+G') : '') +
+      (hasStroke ? it('Convert drawing to shape', 'wand-sparkles', 'convertShape') : '') +
+      it('Add to library', 'book-plus', 'addToLibrary') + sep + it('Delete', 'trash-2', 'delete', 'Del')
+    : it('Paste', 'clipboard-paste', 'paste', 'Ctrl+V') + it('Select all', 'box-select', 'selectAll', 'Ctrl+A') + sep +
+      it('More shapes…', 'shapes', 'shapes', 'S') + it(`Smart guides: ${state.smartGuides ? 'On' : 'Off'}`, 'magnet', 'guides', 'Alt+S') +
+      it('Toggle grid', 'grid-3x3', 'grid', "Ctrl+'") + it('Zoom to fit', 'scan', 'zoomFit', 'Shift+1');
+  const m = $('#ctxMenu');
+  m.innerHTML = html;
+  refreshIcons();
+  m.classList.add('open');
+  toggleShapePicker(false);
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(cx, innerWidth - r.width - 8)) + 'px';
+  m.style.top = Math.max(8, Math.min(cy, innerHeight - r.height - 8)) + 'px';
+}
+const closeContextMenu = () => $('#ctxMenu').classList.remove('open');
+async function clipboardCopy(cut) {
+  if (!state.selected.size) return;
+  try { await navigator.clipboard.writeText(clipboardPayload()); toast(cut ? 'Cut' : 'Copied'); if (cut) deleteSelected(); }
+  catch { toast(`Clipboard blocked by the browser — use Ctrl+${cut ? 'X' : 'C'}`); }
+}
+async function clipboardPaste(at) {
+  try { const t = await navigator.clipboard.readText(); if (t) pasteText(t, at); else toast('Clipboard is empty'); }
+  catch { toast('Clipboard blocked by the browser — press Ctrl+V to paste'); }
 }
 function setZoom(nz, sx = innerWidth / 2, sy = innerHeight / 2) {
   nz = Math.min(30, Math.max(0.1, nz));
@@ -2176,7 +2865,9 @@ function buildToolbar() {
   tb.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     b.blur();
-    if (b.id === 'lockBtn') toggleLock(); else setTool(b.dataset.tool);
+    if (b.id === 'lockBtn') toggleLock();
+    else if (b.dataset.tool === 'shapes') toggleShapePicker();
+    else setTool(b.dataset.tool);
   });
 }
 
@@ -2218,7 +2909,7 @@ function propTargets() {
   return out;
 }
 function curVal(prop) {
-  const t = propTargets().filter((e) => applies(e.type, prop));
+  const t = propTargets().filter((e) => applies(propType(e), prop));
   if (t.length) {
     if (prop === 'arrowType') return t[0].elbowed ? 'elbow' : t[0].roundness ? 'curved' : 'sharp';
     const v = t[0][prop]; return prop === 'roundness' ? (v ? 'round' : 'sharp') : v;
@@ -2226,8 +2917,8 @@ function curVal(prop) {
   return state.style[prop];
 }
 function ctxTypes() {
-  if (state.selected.size) return [...new Set(propTargets().map((e) => e.type))];
-  if (PROPS_BY_TYPE[state.tool]) return [state.tool];
+  if (state.selected.size) return [...new Set(propTargets().map(propType))];
+  if (PROPS_BY_TYPE[toolType(state.tool)]) return [toolType(state.tool)];
   return [];
 }
 function swatchRow(prop, colors) {
@@ -2266,9 +2957,19 @@ function renderProps() {
     h += sec('Arrowheads — end', optRow('endArrowhead', [[null, ICONS.aNone, 'None'], ['arrow', ICONS.aArrow, 'Arrow'], ['triangle', ICONS.aTri, 'Triangle'], ['dot', ICONS.aDot, 'Dot']]));
   }
   if (any('fontSize')) {
-    h += sec('Font size', optRow('fontSize', [[16, 'S', 'Small'], [20, 'M', 'Medium'], [28, 'L', 'Large'], [36, 'XL', 'Extra large']]));
-    h += sec('Font family', optRow('fontFamily', [[1, `<span style="font-family:${FONTS[1].replace(/"/g, "'")};font-size:16px">Aa</span>`, 'Hand-drawn'], [2, `<span style="font-family:${FONTS[2].replace(/"/g, "'")}">Aa</span>`, 'Normal'], [3, `<span style="font-family:${FONTS[3].replace(/"/g, "'")}">Aa</span>`, 'Code']]));
+    const fs = curVal('fontSize'), fam = String(curVal('fontFamily'));
+    h += sec('Font size', optRow('fontSize', [[16, 'S', 'Small'], [20, 'M', 'Medium'], [28, 'L', 'Large'], [36, 'XL', 'Extra large']]) +
+      `<div class="row slider-row"><input type="number" class="num" min="4" max="400" step="1" value="${Math.round(fs)}" data-prop="fontSize" title="Custom font size (px)">` +
+      `<button class="opt" data-action="fontDown" title="Smaller (Ctrl Shift <)">A−</button><button class="opt" data-action="fontUp" title="Larger (Ctrl Shift >)">A+</button></div>`);
+    const q = (c) => c.replace(/"/g, "'");
+    const groups = [...new Set(FONT_LIST.map((f) => f.group))];
+    h += sec('Font family', optRow('fontFamily', [[1, `<span style="font-family:${q(FONTS[1])};font-size:16px">Aa</span>`, 'Hand-drawn (Virgil)'], [2, `<span style="font-family:${q(FONTS[2])}">Aa</span>`, 'Normal'], [3, `<span style="font-family:${q(FONTS[3])}">Aa</span>`, 'Code']]) +
+      `<div class="row" style="margin-top:6px"><select class="sel" data-prop="fontFamily" title="All fonts">${groups.map((g) => `<optgroup label="${g}">${FONT_LIST.filter((f) => f.group === g)
+        .map((f) => `<option value="${f.id}" ${String(f.id) === fam ? 'selected' : ''} style="font-family:${q(f.css)}">${f.name}</option>`).join('')}</optgroup>`).join('')}</select></div>`);
     h += sec('Text align', optRow('textAlign', [['left', ICONS.left, 'Left'], ['center', ICONS.center, 'Center'], ['right', ICONS.right, 'Right']]));
+  }
+  if (state.tool === 'freedraw' && !state.selected.size) {
+    h += sec('Pen → shape', optRow('penShapes', [['auto', '<i data-lucide="wand-sparkles"></i>', 'Auto: clean up shapes when you lift the pen'], ['hold', '<i data-lucide="timer"></i>', 'Hold: pause at the end of a stroke to snap it to a shape'], ['off', '<i data-lucide="pencil"></i>', 'Off: always keep freehand']]));
   }
   if (any('opacity')) h += sec('Opacity', sliderRow('opacity', 0, 100, 10));
   if (state.selected.size) {
@@ -2282,6 +2983,7 @@ function renderProps() {
       <button class="opt" data-action="duplicate" title="Duplicate (Ctrl D)"><i data-lucide="copy"></i></button>
       <button class="opt" data-action="delete" title="Delete (Del)"><i data-lucide="trash-2"></i></button>
       <button class="opt" data-action="addToLibrary" title="Add to library"><i data-lucide="book-plus"></i></button>
+      ${selectedEls().some((e) => e.type === 'freedraw') ? '<button class="opt" data-action="convertShape" title="Convert drawing to shape"><i data-lucide="wand-sparkles"></i></button>' : ''}
       ${state.selected.size > 1 ? '<button class="opt" data-action="group" title="Group (Ctrl G)"><i data-lucide="group"></i></button>' : ''}
       ${grouped ? '<button class="opt" data-action="ungroup" title="Ungroup (Ctrl Shift G)"><i data-lucide="ungroup"></i></button>' : ''}</div>`);
   }
@@ -2298,11 +3000,12 @@ function parseVal(v) {
 function setProp(prop, val, doCommit = true) {
   state.style[prop] = val;
   for (const el of propTargets()) {
-    if (!applies(el.type, prop)) continue;
+    if (!applies(propType(el), prop)) continue;
     if (prop === 'arrowType') { el.elbowed = val === 'elbow'; el.roundness = val === 'curved' ? { type: 2 } : null; delete el._rk; }
     else if (prop === 'roundness') el.roundness = val === 'round' ? { type: el.type === 'rectangle' ? 3 : 2 } : null;
     else el[prop] = val;
     if (el.type === 'text' && !el.containerId) measureText(el);
+    if (prop === 'fontFamily' && document.fonts) document.fonts.load(`20px ${FONTS[val] || FONTS[1]}`).catch(() => {});
     bump(el);
   }
   if (doCommit) commit();
@@ -2325,6 +3028,7 @@ function toggleLibrary(force) {
    ============================================================ */
 function runAction(name) {
   $('#menu').classList.remove('open');
+  closeContextMenu();
   switch (name) {
     case 'open': $('#fileInput').click(); break;
     case 'save': download('drawing.excalidraw', serializeScene(), 'application/json'); toast('Saved as drawing.excalidraw'); break;
@@ -2342,6 +3046,16 @@ function runAction(name) {
     case 'theme': setTheme(state.theme === 'dark' ? 'light' : 'dark'); break;
     case 'help': openModal('#helpModal'); break;
     case 'about': closeModals(); openModal('#aboutModal'); break;
+    case 'guides': state.smartGuides = !state.smartGuides; updateMenuStates(); persist(); toast(`Smart guides ${state.smartGuides ? 'on' : 'off'}`); break;
+    case 'shapes': toggleShapePicker(true); break;
+    case 'cut': clipboardCopy(true); break;
+    case 'copy': clipboardCopy(false); break;
+    case 'paste': clipboardPaste(state.ctxPoint || lastPointer); break;
+    case 'selectAll': selectAll(); break;
+    case 'zoomFit': zoomToFit(); break;
+    case 'fontUp': changeFontSize(1.1); break;
+    case 'fontDown': changeFontSize(1 / 1.1); break;
+    case 'convertShape': convertSelectedStrokes(); break;
     case 'zoomIn': setZoom(state.view.zoom * 1.2); break;
     case 'zoomOut': setZoom(state.view.zoom / 1.2); break;
     case 'zoomReset': setZoom(1); break;
@@ -2374,6 +3088,11 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('[data-close]') || e.target.classList.contains('backdrop')) closeModals();
 });
 $('#menuBtn').addEventListener('click', (e) => { e.currentTarget.blur(); $('#menu').classList.toggle('open'); });
+$('#shapePicker').addEventListener('click', (e) => { const b = e.target.closest('[data-shape]'); if (b) pickShape(b.dataset.shape); });
+window.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('#ctxMenu')) closeContextMenu();
+  if (!e.target.closest('#shapePicker') && !e.target.closest('[data-tool="shapes"]')) toggleShapePicker(false);
+}, true);
 $('#props').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-prop]'); if (!b) return;
   b.blur();
@@ -2383,11 +3102,15 @@ $('#props').addEventListener('click', (e) => {
 $('#props').addEventListener('input', (e) => {
   const i = e.target.closest('input[data-prop]'); if (!i) return;
   const prop = i.dataset.prop;
+  if (i.type === 'number') { const v = +i.value; if (v >= 1) setProp(prop, Math.min(400, v), false); return; }
   setProp(prop, i.type === 'range' ? +i.value : i.value, false);
   if (i.type === 'range') { const v = $(`[data-val-for="${prop}"]`); if (v) v.textContent = i.value; }
   else i.parentElement.style.background = i.value;
 });
-$('#props').addEventListener('change', (e) => { if (e.target.matches('input[data-prop]')) { commit(); renderProps(); } });
+$('#props').addEventListener('change', (e) => {
+  if (e.target.matches('select[data-prop]')) { setProp(e.target.dataset.prop, parseVal(e.target.value)); renderProps(); return; }
+  if (e.target.matches('input[data-prop]')) { commit(); renderProps(); }
+});
 ['#expBg', '#expDark', '#expSel', '#expScale'].forEach((s) => $(s).addEventListener('change', updateExportPreview));
 $('#fileInput').addEventListener('change', async (e) => { const f = e.target.files[0]; if (f) loadScene(await f.text()); e.target.value = ''; });
 $('#imageInput').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) insertImage(f, viewCenter()); e.target.value = ''; });
@@ -2412,7 +3135,7 @@ function startHandleAction(h, p) {
     }
     const endpoint = h.kind === 'point' && (index === 0 || index === el.points.length - 1);
     if (endpoint && el.type === 'arrow') { if (index === 0) el.startBinding = null; else el.endBinding = null; }
-    action = { type: 'point', el, index, endpoint, orig: clone(el) };
+    action = { type: 'point', el, index, endpoint, orig: clone(el), targets: guideTargets(new Set([el.id])) };
     return;
   }
   const orig = new Map(sel.map((el) => [el.id, clone(el)]));
@@ -2423,7 +3146,9 @@ function startHandleAction(h, p) {
     setCursor('grabbing');
   } else {
     const startL = f.angle ? rotPt(p.x, p.y, f.cx, f.cy, -f.angle) : [p.x, p.y];
-    action = { type: 'resize', orig, frame: f, handle: h.handle, startL, single: sel.length === 1,
+    const ex = new Set(orig.keys());
+    for (const el of sel) if (el.boundTextId) ex.add(el.boundTextId);
+    action = { type: 'resize', orig, frame: f, handle: h.handle, startL, single: sel.length === 1, targets: guideTargets(ex),
       keepRatio: sel.every((e) => e.type === 'text' || e.type === 'image'), hasFrame: sel.some((e) => e.type === 'frame') };
   }
 }
@@ -2454,7 +3179,9 @@ canvas.addEventListener('pointerdown', (e) => {
       if (e.altKey && state.selected.size) duplicateSelected(0);
       const ids2 = moveSet();
       unbindOutside(ids2);
-      action = { type: 'move', start: p, orig: new Map([...ids2].map((id) => { const el = byId(id); return [id, { x: el.x, y: el.y }]; })) };
+      const movers = [...ids2].map(byId).filter(Boolean);
+      action = { type: 'move', start: p, orig: new Map(movers.map((el) => [el.id, { x: el.x, y: el.y }])),
+        bbox: movers.length ? commonBounds(movers) : null, targets: guideTargets(ids2) };
     } else {
       if (!e.shiftKey) state.selected.clear();
       action = { type: 'box', start: p, cur: p, base: new Set(state.selected) };
@@ -2477,13 +3204,16 @@ canvas.addEventListener('pointerdown', (e) => {
     editText(el, true);
     return;
   }
-  const start = tool === 'freedraw' ? p : snapPt(p);
-  const el = createElement(tool, start);
+  const targets = tool === 'freedraw' || tool === 'arrow' || state.grid ? null : guideTargets(new Set());
+  const start = tool === 'freedraw' ? p : state.grid ? snapPt(p) : snapPointToGuides(p, targets, e);
+  const shapeKind = tool.startsWith('shape:') ? tool.slice(6) : null;
+  const el = createElement(shapeKind ? 'shape' : tool, start);
+  if (shapeKind) el.shape = SHAPES[shapeKind] ? shapeKind : 'triangle';
   if (tool === 'freedraw') { el.simulatePressure = e.pointerType !== 'pen'; el.pressures = [e.pressure || 0.5]; }
   if (tool === 'arrow') { const t = findBindTarget(p); if (t) el.startBinding = makeBinding(t, p); }
   if (tool === 'frame') state.elements.unshift(el); else state.elements.push(el);
   state.selected.clear();
-  action = { type: 'create', el, start, cur: p };
+  action = { type: 'create', el, start, cur: p, targets };
   renderProps(); requestRender();
 });
 canvas.addEventListener('pointermove', (e) => {
@@ -2497,18 +3227,27 @@ canvas.addEventListener('pointermove', (e) => {
       state.view.y = action.vy + (e.clientY - action.sy) / z;
       break;
     }
-    case 'create': updateCreate(action, p, e); break;
+    case 'create':
+      if (action.snapped) break;
+      updateCreate(action, p, e);
+      if (action.el.type === 'freedraw' && state.style.penShapes === 'hold') armHold(action, p);
+      break;
     case 'move': {
-      let dx = p.x - action.start.x, dy = p.y - action.start.y;
-      if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+      let dx = p.x - action.start.x, dy = p.y - action.start.y, lockX = false, lockY = false;
+      if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) { dy = 0; lockY = true; } else { dx = 0; lockX = true; } }
       const first = action.orig.values().next().value;
       if (state.grid && first) { dx = snap(first.x + dx) - first.x; dy = snap(first.y + dy) - first.y; }
+      else [dx, dy] = snapMove(action, dx, dy, lockX, lockY, e);
       for (const [id, o] of action.orig) { const el = byId(id); if (el) { el.x = o.x + dx; el.y = o.y + dy; } }
       break;
     }
-    case 'resize': doResize(action, p, e.shiftKey); break;
+    case 'resize': doResize(action, action.frame.angle ? p : snapPointToGuides(p, action.targets, e), e.shiftKey); break;
     case 'rotate': doRotate(action, p, e.shiftKey); break;
-    case 'point': doPoint(action, p, e.shiftKey); break;
+    case 'point': {
+      const hint = action.el.type === 'arrow' && action.endpoint && findBindTarget(p);
+      doPoint(action, hint || state.grid ? p : snapPointToGuides(p, action.targets, e), e.shiftKey);
+      break;
+    }
     case 'box': {
       action.cur = p;
       const x1 = Math.min(action.start.x, p.x), x2 = Math.max(action.start.x, p.x), y1 = Math.min(action.start.y, p.y), y2 = Math.max(action.start.y, p.y);
@@ -2532,6 +3271,25 @@ function endPointer() {
     case 'pan': persist(); break;
     case 'create': {
       const el = a.el;
+      if (el.type === 'freedraw') {
+        clearTimeout(a.holdTimer);
+        if (a.snapped) {
+          updateFrameMembership([a.snapped.el]);
+          commit();
+          toast(`Snapped to ${a.snapped.rec.label} · Ctrl+Z to undo`);
+          break;
+        }
+        normalize(el); updateFrameMembership([el]); commit();
+        if (state.style.penShapes === 'auto') {
+          const r = convertFreedraw(el);
+          if (r) { updateFrameMembership([r.el]); commit(); toast(`Converted to ${r.rec.label} · Ctrl+Z to keep freehand`); }
+        }
+        break;
+      }
+      if (el.type === 'shape' && Math.abs(el.width) < 3 && Math.abs(el.height) < 3) {
+        const [dw, dh] = (SHAPES[el.shape] || SHAPES.triangle).size;
+        el.x = a.start.x - dw / 2; el.y = a.start.y - dh / 2; el.width = dw; el.height = dh; bump(el);
+      }
       if (el.type === 'arrow' && state.bindHint && a.cur) el.endBinding = makeBinding(state.bindHint, a.cur);
       const tooSmall = isLinear(el)
         ? Math.hypot(...el.points[el.points.length - 1]) < 3
@@ -2574,12 +3332,24 @@ function endPointer() {
       break;
   }
   state.bindHint = null;
+  state.guideLines = [];
   updateCursor(lastPointer);
   renderProps(); requestRender();
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (state.editor) return;
+  const p = toWorld(e.clientX, e.clientY);
+  state.ctxPoint = p;
+  const hit = elementAt(p);
+  if (hit && !state.selected.has(hit.id)) state.selected = new Set(groupMembers(hit));
+  if (!hit) state.selected.clear();
+  if (state.tool !== 'selection') setTool('selection', true);
+  renderProps(); requestRender();
+  openContextMenu(e.clientX, e.clientY);
+});
 canvas.addEventListener('dblclick', (e) => {
   if (state.tool !== 'selection') return;
   const p = toWorld(e.clientX, e.clientY);
@@ -2630,6 +3400,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (document.querySelector('.backdrop.open')) { closeModals(); return; }
     $('#menu').classList.remove('open');
+    if ($('#ctxMenu').classList.contains('open') || $('#shapePicker').classList.contains('open')) { closeContextMenu(); toggleShapePicker(false); return; }
     state.selected.clear(); setTool('selection'); return;
   }
   if (document.querySelector('.backdrop.open')) return;
@@ -2648,11 +3419,14 @@ window.addEventListener('keydown', (e) => {
     else if (e.code === 'BracketRight') reorder(e.shiftKey ? 'front' : 'forward');
     else if (e.code === 'BracketLeft') reorder(e.shiftKey ? 'back' : 'backward');
     else if (e.key === "'") runAction('grid');
+    else if (e.shiftKey && (e.code === 'Period' || e.key === '>')) changeFontSize(1.1);
+    else if (e.shiftKey && (e.code === 'Comma' || e.key === '<')) changeFontSize(1 / 1.1);
     else return;
     e.preventDefault();
     return;
   }
   if (e.altKey && e.shiftKey && e.code === 'KeyD') { runAction('theme'); e.preventDefault(); return; }
+  if (e.altKey && !e.shiftKey && e.code === 'KeyS') { runAction('guides'); e.preventDefault(); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); e.preventDefault(); return; }
   if (e.key.startsWith('Arrow') && state.selected.size) {
     const s = e.shiftKey ? 10 : 1;
@@ -2673,6 +3447,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '?') { openModal('#helpModal'); return; }
   if (e.altKey) return;
   if (k === 'q') { toggleLock(); return; }
+  if (k === 's' && !e.shiftKey) { toggleShapePicker(); return; }
   if (KEYMAP[k] !== undefined && !e.shiftKey) setTool(KEYMAP[k]);
 });
 window.addEventListener('keyup', (e) => { if (e.key === ' ') { state.space = false; updateCursor(lastPointer); } });
@@ -2703,20 +3478,23 @@ document.addEventListener('paste', (e) => {
   const text = e.clipboardData.getData('text/plain');
   if (!text) return;
   e.preventDefault();
+  pasteText(text, lastPointer);
+});
+function pasteText(text, at) {
   let els = null;
   try {
     const d = JSON.parse(text);
     if (d && /^excalidraw|sketchboard/.test(d.type) && Array.isArray(d.elements)) { addFiles(d.files); els = importElements(d.elements); }
   } catch { /* plain text */ }
-  if (els && els.length) { insertElements(els, lastPointer); return; }
-  const el = createElement('text', lastPointer);
+  if (els && els.length) { insertElements(els, at); return; }
+  const el = createElement('text', at);
   el.text = el.originalText = text; measureText(el);
   state.elements.push(el);
   state.selected = new Set([el.id]);
   updateFrameMembership([el]);
   setTool('selection', true);
   commit(); renderProps(); requestRender();
-});
+}
 
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', async (e) => {
@@ -2742,7 +3520,9 @@ window.addEventListener('beforeunload', () => {
    Boot
    ============================================================ */
 buildToolbar();
+buildShapePicker();
 loadLocal();
+updateMenuStates();
 loadLibrary();
 cleanup(); syncDerived();
 history.stack = [snapshot()]; history.index = 0;
